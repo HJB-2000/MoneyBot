@@ -27,6 +27,11 @@ from risk.manager import RiskManager
 from risk.position_sizer import PositionSizer
 from execution.smart_executor import SmartExecutor
 from execution.order_manager import OrderManager
+from signals.group_candles import CandleSignals
+from signals.group_orderbook import OrderBookSignals
+from signals.group_trades import TradeSignals
+from signals.group_futures import FuturesSignals
+from signals.group_derived import DerivedSignals
 from strategies.triangular_arb import TriangularArbStrategy
 from strategies.stat_arb import StatArbStrategy
 from strategies.funding_arb import FundingArbStrategy
@@ -89,6 +94,13 @@ class MasterEngine:
         self.order_manager = OrderManager()
         self.scorer = OpportunityScorer(self.config)
 
+        # 30-signal groups for Bayesian scoring
+        self._candle_sig   = CandleSignals()
+        self._ob_sig       = OrderBookSignals()
+        self._trade_sig    = TradeSignals()
+        self._futures_sig  = FuturesSignals()
+        self._derived_sig  = DerivedSignals()
+
         # Threading
         self.brain_queue: queue.Queue = queue.Queue(maxsize=1)
         self.opp_queue: queue.Queue = queue.Queue(maxsize=50)
@@ -102,6 +114,7 @@ class MasterEngine:
         self._current_combiner_result = None
         self._current_regime: str = "CHOPPY"
         self._current_route = None
+        self._current_signals_30: dict = {}   # the 30 Bayesian signals
 
     # ------------------------------------------------------------------ #
     #  Startup                                                             #
@@ -211,19 +224,36 @@ class MasterEngine:
         self._current_signal_objects = dict(self.signals_map)
         self._current_signal_objects["_combiner_result"] = combiner_result
         self._current_signal_objects["_route_result"] = route
+        self._current_signal_objects["_signals_30"] = self._current_signals_30
         self._current_combiner_result = combiner_result
         self._current_regime = regime
         self._current_route = route
 
-        # Push to brain queue (drop old if full)
+        # Compute 30 Bayesian signals
         try:
-            self.brain_queue.put_nowait((regime, route, scores, combiner_result, self._current_signal_objects))
+            c_scores = self._candle_sig.calculate(candles)
+            ob_scores = self._ob_sig.calculate(ob or {"bids": [], "asks": []},
+                                               trade_size_usd=50.0)
+            t_scores = self._trade_sig.calculate(trades or [], candles)
+            f_scores = self._futures_sig.calculate(funding or 0.0, oi or 1000,
+                                                   trades or [], candles)
+            d_scores = self._derived_sig.calculate(c_scores, t_scores)
+            self._current_signals_30 = {**c_scores, **ob_scores,
+                                        **t_scores, **f_scores, **d_scores}
+        except Exception as e:
+            logger.warning(f"30-signal compute error: {e}")
+
+        # Push to brain queue (drop old if full)
+        payload = (regime, route, scores, combiner_result,
+                   self._current_signal_objects, self._current_signals_30)
+        try:
+            self.brain_queue.put_nowait(payload)
         except queue.Full:
             try:
                 self.brain_queue.get_nowait()
             except queue.Empty:
                 pass
-            self.brain_queue.put_nowait((regime, route, scores, combiner_result, self._current_signal_objects))
+            self.brain_queue.put_nowait(payload)
 
     # ------------------------------------------------------------------ #
     #  Thread 3 — Scan                                                     #
@@ -233,14 +263,14 @@ class MasterEngine:
         while self._running:
             try:
                 item = self.brain_queue.get(timeout=60)
-                regime, route, signals, combiner_result, signal_objects = item
-                self._run_scan(regime, route, signals, combiner_result, signal_objects)
+                regime, route, signals, combiner_result, signal_objects, signals_30 = item
+                self._run_scan(regime, route, signals, combiner_result, signal_objects, signals_30)
             except queue.Empty:
                 pass
             except Exception as e:
                 logger.error(f"ScanThread error: {e}", exc_info=True)
 
-    def _run_scan(self, regime, route, signals, combiner_result, signal_objects):
+    def _run_scan(self, regime, route, signals, combiner_result, signal_objects, signals_30):
         if not route.strategies:
             return
 
@@ -271,13 +301,13 @@ class MasterEngine:
         count = 0
         for opp in all_opportunities:
             try:
-                self.opp_queue.put_nowait((opp, signals, combiner_result, signal_objects, regime))
+                self.opp_queue.put_nowait((opp, signals, combiner_result, signal_objects, regime, signals_30))
                 count += 1
             except queue.Full:
                 break
 
         if count > 0:
-            logger.debug(f"Scan found {count} opportunities (regime={regime})")
+            logger.info(f"Scan found {count} opportunities (regime={regime})")
 
     # ------------------------------------------------------------------ #
     #  Thread 4 — Execution                                                #
@@ -293,7 +323,7 @@ class MasterEngine:
         while self._running:
             try:
                 item = self.opp_queue.get(timeout=5)
-                opp, signals, combiner_result, signal_objects, regime = item
+                opp, signals, combiner_result, signal_objects, regime, signals_30 = item
             except queue.Empty:
                 continue
             except Exception:
@@ -301,10 +331,10 @@ class MasterEngine:
 
             try:
                 self._cycle_count += 1
-                # Score
+                # Score using Bayesian 30 signals
                 score = self.scorer.score(
                     opp, regime, signals, combiner_result, signal_objects,
-                    self.pair_ranker
+                    self.pair_ranker, signals_30=signals_30
                 )
                 if score < exec_threshold:
                     continue

@@ -168,6 +168,18 @@
   </div>
 </div>
 
+<!-- Signal snapshot + Bot log -->
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Signal Snapshot</div>
+    <div id="signal-snapshot"><span style="color:var(--muted)">Loading…</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Bot Log <span style="color:var(--muted);font-size:10px">(last 50 lines)</span></div>
+    <pre id="bot-log" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">(loading…)</pre>
+  </div>
+</div>
+
 <script>
 // ── tiny canvas line chart ──────────────────────────────────────────────────
 function drawChart(canvas, points) {
@@ -337,8 +349,52 @@ async function update() {
   }
 }
 
+// ── signals + log polling (every 10s) ──────────────────────────────────────
+async function updateSignalsAndLog() {
+  try {
+    const [sigRes, logRes] = await Promise.all([
+      fetch('/api/signals'),
+      fetch('/api/logs'),
+    ]);
+    const sig = await sigRes.json();
+    const log = await logRes.json();
+
+    // Signal snapshot
+    const snap = document.getElementById('signal-snapshot');
+    if (sig.regime) {
+      const confPct = (sig.confidence * 100).toFixed(0);
+      const confColor = sig.confidence > 0.5 ? 'var(--green)' : sig.confidence > 0.3 ? 'var(--yellow)' : 'var(--red)';
+      snap.innerHTML = `
+        <div class="weight-row"><span class="weight-label">Regime</span><span class="regime-badge regime-${sig.regime}">${sig.regime}</span></div>
+        <div class="weight-row" style="margin-top:8px">
+          <span class="weight-label">Confidence</span>
+          <div class="weight-bar-wrap"><div class="weight-bar" style="width:${confPct}%;background:${confColor}"></div></div>
+          <span class="weight-val">${confPct}%</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-label">ATR Ratio</span>
+          <span style="color:${sig.atr_ratio > 1.5 ? 'var(--red)' : 'var(--green)'}">${sig.atr_ratio.toFixed(3)}</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-label">Funding Rate</span>
+          <span class="${sig.funding_rate > 0 ? 'pos' : 'neg'}">${(sig.funding_rate * 100).toFixed(4)}%</span>
+        </div>
+        <div class="weight-row"><span class="weight-label">Updated</span><span style="color:var(--muted)">${sig.ts.slice(11,19)}</span></div>`;
+    }
+
+    // Bot log
+    document.getElementById('bot-log').textContent = log.lines.join('\n');
+    // Auto-scroll to bottom
+    const pre = document.getElementById('bot-log');
+    pre.scrollTop = pre.scrollHeight;
+
+  } catch (e) {}
+}
+
 update();
 setInterval(update, 5000);
+updateSignalsAndLog();
+setInterval(updateSignalsAndLog, 10000);
 window.addEventListener('resize', () => {
   fetch('/api/status').then(r => r.json()).then(d => {
     const pts = d.capital.history.map(h => h.balance);

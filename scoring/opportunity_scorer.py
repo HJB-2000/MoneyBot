@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 from strategies.base_strategy import Opportunity
+from bayesian.network import BayesianNetwork
 
 OPP_LOG = "data/opportunity_log.csv"
 
@@ -13,6 +14,7 @@ class OpportunityScorer:
     def __init__(self, config: dict):
         self._obs_threshold = config["scoring"]["observation_threshold"]
         self._exec_threshold = config["scoring"]["execution_threshold"]
+        self._bayes = BayesianNetwork()
         self._ensure_log()
 
     def _ensure_log(self):
@@ -27,7 +29,7 @@ class OpportunityScorer:
 
     def score(self, opp: Opportunity, regime: str,
               signals: dict, combiner_result, signal_objects: dict,
-              pair_ranker=None) -> float:
+              pair_ranker=None, signals_30: dict = None) -> float:
         """Score opportunity 0.0–1.0. Returns 0.0 if hard rejected."""
 
         # ---- Hard rejects ----
@@ -75,8 +77,12 @@ class OpportunityScorer:
         # Filter 2: Liquidity (20%)
         f2 = self._liquidity_score(opp.liquidity_ratio)
 
-        # Filter 3: Signal consensus (20%)
-        f3 = combiner_result.confidence
+        # Filter 3: Bayesian win probability from 30 trained signals (20%)
+        # Falls back to combiner confidence if 30 signals not available yet.
+        if signals_30:
+            f3 = self._bayes.compute(signals_30, opp.strategy, regime, opp.direction)
+        else:
+            f3 = combiner_result.confidence
 
         # Filter 4: Execution speed (15%)
         f4 = self._latency_score(opp.exchange_latency_ms)

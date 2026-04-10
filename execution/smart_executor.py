@@ -52,7 +52,8 @@ class SmartExecutor:
 
         # Check 4 — re-score
         new_score = self._scorer.score(
-            opp, regime, signals, combiner_result, signal_objects
+            opp, regime, signals, combiner_result, signal_objects,
+            signals_30=signal_objects.get("_signals_30")
         )
         exec_threshold = self._cfg["scoring"]["execution_threshold"]
         if new_score < exec_threshold:

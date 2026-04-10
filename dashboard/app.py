@@ -21,6 +21,7 @@ REGIME_LOG     = ROOT / "data" / "regime_log.csv"
 OPP_LOG        = ROOT / "data" / "opportunity_log.csv"
 WEIGHTS_FILE   = ROOT / "data" / "signal_weights.json"
 PAIR_CSV       = ROOT / "data" / "pair_rankings.csv"
+BOT_LOG        = ROOT / "logs" / "bot.log"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -129,6 +130,29 @@ def _recent_opps(n: int = 10) -> list[dict]:
     return out
 
 
+def _bot_log_tail(n: int = 50) -> list[str]:
+    if not BOT_LOG.exists() or BOT_LOG.stat().st_size == 0:
+        return ["(no log yet)"]
+    lines = BOT_LOG.read_text(errors="replace").splitlines()
+    return lines[-n:]
+
+
+def _signal_history() -> dict:
+    """Last regime row as signal snapshot."""
+    rows = _read_csv_tail(REGIME_LOG, 1)
+    if not rows:
+        return {}
+    r = rows[-1]
+    return {
+        "regime":       r.get("regime", "UNKNOWN"),
+        "confidence":   _safe_float(r.get("confidence")),
+        "score":        _safe_float(r.get("score")),
+        "atr_ratio":    _safe_float(r.get("atr_ratio", 1)),
+        "funding_rate": _safe_float(r.get("funding_rate", 0)),
+        "ts":           r.get("timestamp", "—"),
+    }
+
+
 def _pair_rankings() -> list[dict]:
     rows = _read_csv_tail(PAIR_CSV, 50)
     out = []
@@ -159,6 +183,14 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         return render_template("index.html")
+
+    @app.route("/api/logs")
+    def logs():
+        return jsonify({"lines": _bot_log_tail(80)})
+
+    @app.route("/api/signals")
+    def signals():
+        return jsonify(_signal_history())
 
     @app.route("/api/status")
     def status():

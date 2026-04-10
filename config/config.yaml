@@ -71,8 +71,8 @@ signal_weights:
   whale:          0.05
 
 scoring:
-  observation_threshold: 0.45
-  execution_threshold: 0.72
+  observation_threshold: 0.30
+  execution_threshold: 0.55
 
 risk:
   max_daily_loss_pct: 0.05
