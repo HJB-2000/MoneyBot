@@ -124,26 +124,17 @@ pairs:
     - PEPE/USDT
 
 triangular_paths:
-  - [USDT, POL, ETH, USDT]
-  - [USDT, LINK, ETH, USDT]
-  - [USDT, UNI, ETH, USDT]
-  - [USDT, AAVE, ETH, USDT]
-  - [USDT, ARB, ETH, USDT]
-  - [USDT, OP, ETH, USDT]
-  - [USDT, FIL, ETH, USDT]
-  - [USDT, LDO, ETH, USDT]
-  - [USDT, SNX, ETH, USDT]
+  # Only pairs that actually exist on Binance spot
+  - [USDT, ETH, BTC, USDT]
+  - [USDT, BNB, BTC, USDT]
+  - [USDT, BNB, ETH, USDT]
+  - [USDT, XRP, BTC, USDT]
   - [USDT, ADA, BTC, USDT]
   - [USDT, DOT, BTC, USDT]
-  - [USDT, ATOM, BTC, USDT]
   - [USDT, LTC, BTC, USDT]
-  - [USDT, XRP, BTC, USDT]
-  - [USDT, NEAR, BTC, USDT]
-  - [USDT, APT, BTC, USDT]
-  - [USDT, INJ, BNB, USDT]
-  - [USDT, SEI, BNB, USDT]
-  - [USDT, RAY, SOL, USDT]
-  - [USDT, JTO, SOL, USDT]
+  - [USDT, LINK, BTC, USDT]
+  - [USDT, ATOM, BTC, USDT]
+  - [USDT, DOGE, BTC, USDT]
 
 grid_pairs:
   - POL/USDT
