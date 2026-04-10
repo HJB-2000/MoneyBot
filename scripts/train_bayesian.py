@@ -8,6 +8,10 @@ import os
 import sys
 import json
 
+# Force unbuffered output so logs are visible immediately in nohup/background runs
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # Ensure project root is in path
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)

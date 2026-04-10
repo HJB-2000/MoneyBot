@@ -153,7 +153,7 @@ echo ""
 nohup bash -c '
   START_TIME=$(date +%s)
 
-  python3 scripts/train_bayesian.py >> logs/training.log 2>&1
+  python3 -u scripts/train_bayesian.py >> logs/training.log 2>&1
   EXIT_CODE=$?
 
   END_TIME=$(date +%s)
