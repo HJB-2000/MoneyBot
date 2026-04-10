@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoneyBot Dashboard</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --card: #161a22;
+    --border: #1f2535;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); }
+  #status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+  #status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #last-update { color: var(--muted); font-size: 12px; }
+
+  .grid { display: grid; gap: 16px; padding: 20px; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .card-value { font-size: 28px; font-weight: 700; }
+  .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .neutral { color: var(--text); }
+
+  /* Regime badge */
+  .regime-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
+  .regime-VOLATILE      { background: rgba(239,68,68,.2);  color: #ef4444; }
+  .regime-TRENDING_UP   { background: rgba(34,197,94,.2);  color: #22c55e; }
+  .regime-TRENDING_DOWN { background: rgba(239,68,68,.15); color: #f87171; }
+  .regime-BREAKOUT      { background: rgba(234,179,8,.2);  color: #eab308; }
+  .regime-FUNDING_RICH  { background: rgba(168,85,247,.2); color: #a855f7; }
+  .regime-RANGING       { background: rgba(59,130,246,.2); color: #3b82f6; }
+  .regime-CHOPPY        { background: rgba(100,116,139,.2);color: #94a3b8; }
+  .regime-WHALE_MOVING  { background: rgba(6,182,212,.2);  color: #06b6d4; }
+  .regime-UNKNOWN       { background: rgba(100,116,139,.2);color: #94a3b8; }
+
+  /* Bar chart for weights */
+  .weight-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .weight-label { width: 110px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .weight-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 10px; overflow: hidden; }
+  .weight-bar { height: 100%; background: var(--cyan); border-radius: 4px; transition: width .4s; }
+  .weight-val { width: 38px; text-align: right; font-size: 12px; color: var(--text); }
+
+  /* Capital chart */
+  #cap-chart { width: 100%; height: 120px; }
+
+  /* Confidence bar */
+  .conf-wrap { background: var(--border); border-radius: 4px; height: 8px; margin-top: 6px; overflow: hidden; }
+  .conf-bar { height: 100%; border-radius: 4px; transition: width .4s; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 7px 8px; border-bottom: 1px solid rgba(31,37,53,.6); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .badge-win  { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-loss { background: rgba(239,68,68,.15);  color: var(--red); }
+  .badge-exec { background: rgba(59,130,246,.15); color: var(--blue); }
+  .badge-obs  { background: rgba(100,116,139,.15);color: var(--muted); }
+
+  .tier-A { color: var(--green);  font-weight: 700; }
+  .tier-B { color: var(--yellow); font-weight: 700; }
+  .tier-C { color: var(--red);    font-weight: 700; }
+
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#9889; MoneyBot</h1>
+  <div>
+    <span id="status-dot"></span>
+    <span id="last-update">Connecting…</span>
+  </div>
+</header>
+
+<!-- KPI row -->
+<div class="grid grid-4">
+  <div class="card">
+    <div class="card-title">Capital</div>
+    <div class="card-value" id="balance">$0.00</div>
+    <div class="card-sub" id="daily-pnl">Daily P&L: —</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Win Rate</div>
+    <div class="card-value" id="win-rate">0%</div>
+    <div class="card-sub" id="wl-counts">W:0 / L:0</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Drawdown</div>
+    <div class="card-value" id="drawdown">0%</div>
+    <div class="card-sub" id="total-pnl">Total P&L: —</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Regime</div>
+    <div id="regime-badge-wrap" style="margin-top:4px"><span class="regime-badge regime-UNKNOWN">UNKNOWN</span></div>
+    <div class="card-sub" style="margin-top:8px">
+      Conf: <span id="regime-conf">—</span>
+      <div class="conf-wrap"><div class="conf-bar" id="conf-bar" style="width:0%;background:var(--cyan)"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart + Weights + Regime detail -->
+<div class="grid grid-3">
+  <div class="card" style="grid-column: span 2">
+    <div class="card-title">Capital History</div>
+    <canvas id="cap-chart"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Signal Weights</div>
+    <div id="weights-chart"></div>
+  </div>
+</div>
+
+<!-- Trades + Opportunities -->
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Recent Trades</div>
+    <table>
+      <thead><tr><th>Time</th><th>Pair</th><th>Strategy</th><th>P&L</th><th>Result</th></tr></thead>
+      <tbody id="trades-body"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-title">Recent Opportunities</div>
+    <table>
+      <thead><tr><th>Time</th><th>Pair</th><th>Strategy</th><th>Profit%</th><th>Score</th><th>Status</th></tr></thead>
+      <tbody id="opps-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pair rankings -->
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <div class="card-title">Pair Rankings</div>
+    <table>
+      <thead><tr><th>Pair</th><th>Tier</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Win Rate</th></tr></thead>
+      <tbody id="pairs-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ── tiny canvas line chart ──────────────────────────────────────────────────
+function drawChart(canvas, points) {
+  if (!points.length) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const pad = { t: 10, b: 20, l: 50, r: 10 };
+  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, 'rgba(6,182,212,.3)');
+  grad.addColorStop(1, 'rgba(6,182,212,0)');
+
+  const xs = i => pad.l + (i / (points.length - 1)) * cw;
+  const ys = v => pad.t + ch - ((v - min) / range) * ch;
+
+  ctx.beginPath();
+  ctx.moveTo(xs(0), ys(points[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
+  ctx.lineTo(xs(points.length - 1), pad.t + ch);
+  ctx.lineTo(xs(0), pad.t + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xs(0), ys(points[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
+  ctx.strokeStyle = '#06b6d4';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'right';
+  ctx.fillText('$' + max.toFixed(2), pad.l - 4, pad.t + 8);
+  ctx.fillText('$' + min.toFixed(2), pad.l - 4, pad.t + ch);
+  ctx.fillText('$' + points[points.length - 1].toFixed(2), pad.l - 4, ys(points[points.length - 1]) + 4);
+}
+
+// ── render helpers ──────────────────────────────────────────────────────────
+function fmt(v) { return v >= 0 ? '+' + v.toFixed(4) : v.toFixed(4); }
+function fmtPct(v) { return (v * 100).toFixed(2) + '%'; }
+function colorClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neutral'; }
+
+function renderWeights(weights) {
+  const max = Math.max(...Object.values(weights), 0.01);
+  const wrap = document.getElementById('weights-chart');
+  wrap.innerHTML = Object.entries(weights)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `
+      <div class="weight-row">
+        <span class="weight-label">${k.replace('_', ' ')}</span>
+        <div class="weight-bar-wrap"><div class="weight-bar" style="width:${(v/max*100).toFixed(1)}%"></div></div>
+        <span class="weight-val">${(v*100).toFixed(1)}%</span>
+      </div>`).join('');
+}
+
+function renderTrades(trades) {
+  const tbody = document.getElementById('trades-body');
+  if (!trades.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center">No trades yet</td></tr>'; return; }
+  tbody.innerHTML = trades.map(t => `
+    <tr>
+      <td style="color:var(--muted)">${t.ts.slice(11)}</td>
+      <td>${t.pair}</td>
+      <td style="color:var(--muted)">${t.strategy}</td>
+      <td class="${colorClass(t.net_pnl)}">${fmt(t.net_pnl)}</td>
+      <td><span class="badge badge-${t.result.toLowerCase()}">${t.result}</span></td>
+    </tr>`).join('');
+}
+
+function renderOpps(opps) {
+  const tbody = document.getElementById('opps-body');
+  if (!opps.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center">No opportunities yet</td></tr>'; return; }
+  tbody.innerHTML = opps.map(o => `
+    <tr>
+      <td style="color:var(--muted)">${o.ts.slice(11)}</td>
+      <td>${o.pair}</td>
+      <td style="color:var(--muted)">${o.strategy}</td>
+      <td class="pos">${fmtPct(o.profit_pct)}</td>
+      <td>${(o.score * 100).toFixed(0)}%</td>
+      <td><span class="badge ${o.executed ? 'badge-exec' : 'badge-obs'}">${o.executed ? 'EXEC' : 'OBS'}</span></td>
+    </tr>`).join('');
+}
+
+function renderPairs(pairs) {
+  const tbody = document.getElementById('pairs-body');
+  if (!pairs.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center">No data yet</td></tr>'; return; }
+  tbody.innerHTML = pairs.map(p => `
+    <tr>
+      <td><strong>${p.pair}</strong></td>
+      <td><span class="tier-${p.tier}">${p.tier}</span></td>
+      <td>${p.trades}</td>
+      <td class="pos">${p.wins}</td>
+      <td class="neg">${p.losses}</td>
+      <td class="${colorClass(p.win_rate - 0.5)}">${(p.win_rate * 100).toFixed(1)}%</td>
+    </tr>`).join('');
+}
+
+// ── main poll loop ──────────────────────────────────────────────────────────
+async function update() {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+
+    // Header
+    document.getElementById('status-dot').className = 'live';
+    document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    // KPIs
+    const bal = d.capital.balance;
+    document.getElementById('balance').textContent = '$' + bal.toFixed(2);
+    const dp = d.capital.daily_pnl;
+    document.getElementById('daily-pnl').innerHTML =
+      `Daily P&L: <span class="${colorClass(dp)}">${dp >= 0 ? '+' : ''}$${dp.toFixed(2)}</span>`;
+
+    const wr = d.stats.win_rate;
+    document.getElementById('win-rate').textContent = (wr * 100).toFixed(1) + '%';
+    document.getElementById('win-rate').className = 'card-value ' + colorClass(wr - 0.5);
+    document.getElementById('wl-counts').textContent = `W:${d.stats.wins} / L:${d.stats.losses}`;
+
+    const dd = d.capital.drawdown;
+    document.getElementById('drawdown').textContent = dd.toFixed(2) + '%';
+    document.getElementById('drawdown').className = 'card-value ' + (dd > 10 ? 'neg' : dd > 5 ? 'neutral' : 'pos');
+    const tp = d.stats.total_pnl;
+    document.getElementById('total-pnl').innerHTML =
+      `Total P&L (20): <span class="${colorClass(tp)}">${tp >= 0 ? '+' : ''}$${tp.toFixed(4)}</span>`;
+
+    // Regime
+    const reg = d.regime.regime;
+    document.getElementById('regime-badge-wrap').innerHTML =
+      `<span class="regime-badge regime-${reg}">${reg}</span>`;
+    const conf = d.regime.confidence;
+    document.getElementById('regime-conf').textContent = (conf * 100).toFixed(0) + '%';
+    const bar = document.getElementById('conf-bar');
+    bar.style.width = (conf * 100) + '%';
+    bar.style.background = conf > 0.7 ? 'var(--green)' : conf > 0.4 ? 'var(--yellow)' : 'var(--red)';
+
+    // Capital chart
+    const canvas = document.getElementById('cap-chart');
+    const pts = d.capital.history.map(h => h.balance);
+    if (pts.length > 1) drawChart(canvas, pts);
+
+    // Signal weights
+    if (Object.keys(d.weights).length) renderWeights(d.weights);
+
+    // Tables
+    renderTrades(d.trades);
+    renderOpps(d.opportunities);
+    renderPairs(d.pairs);
+
+  } catch (e) {
+    document.getElementById('status-dot').className = '';
+    document.getElementById('last-update').textContent = 'Disconnected — retrying…';
+  }
+}
+
+update();
+setInterval(update, 5000);
+window.addEventListener('resize', () => {
+  fetch('/api/status').then(r => r.json()).then(d => {
+    const pts = d.capital.history.map(h => h.balance);
+    if (pts.length > 1) drawChart(document.getElementById('cap-chart'), pts);
+  }).catch(() => {});
+});
+</script>
+</body>
+</html>

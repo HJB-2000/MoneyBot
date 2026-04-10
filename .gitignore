@@ -1,0 +1,40 @@
+# Claude Code local files — never push
+.claude/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Local data — stays private, too large for GitHub
+data/historical/
+data/*.csv
+data/*.json
+data/*.db
+moneyBot.db
+
+# Logs — local only
+logs/
+
+# Secrets / env
+.env
+*.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Reports / local output
+reports/
+
+# Misc
+*.tmp
+*.bak
+dashbord.text
+plan.md
+server.md

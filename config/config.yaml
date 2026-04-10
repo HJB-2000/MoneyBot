@@ -1,0 +1,167 @@
+exchange:
+  name: binance
+  paper_mode: true
+  testnet: false
+
+capital:
+  starting_capital: 50.0
+  survival_floor: 1.0
+  max_position_pct: 0.10
+  kelly_fraction: 0.25
+  kelly_min_trades: 50
+
+capital_tiers:
+  below_500:    0.08
+  500_to_1000:  0.06
+  1000_to_2000: 0.04
+  above_2000:   0.03
+
+strategies:
+  triangular_arb:
+    enabled: true
+    min_profit_pct: 0.0005
+    max_paths: 30
+    max_execution_seconds: 5
+  stat_arb:
+    enabled: true
+    correlation_threshold: 0.85
+    z_score_entry: 2.0
+    z_score_exit: 0.5
+    z_score_stop: 3.5
+    max_hold_hours: 4
+    stop_loss_pct: 0.015
+  funding_arb:
+    enabled: true
+    min_funding_rate: 0.0008
+    exit_funding_rate: 0.0002
+  grid_trader:
+    enabled: true
+    grid_levels: 10
+    grid_spacing_atr_mult: 0.5
+    max_grids_running: 2
+    capital_per_grid_pct: 0.15
+  mean_reversion:
+    enabled: true
+    drop_threshold_pct: 0.02
+    drop_window_minutes: 5
+    target_recovery_pct: 0.01
+    stop_loss_pct: 0.015
+    max_hold_minutes: 60
+  volume_spike:
+    enabled: true
+    volume_multiplier: 3.0
+    window_minutes: 5
+    stop_loss_pct: 0.012
+    max_hold_minutes: 30
+  correlation_breakout:
+    enabled: true
+    btc_move_threshold: 0.02
+    lag_window_minutes: 10
+    min_correlation: 0.80
+    stop_loss_pct: 0.015
+
+signal_weights:
+  price_action:   0.15
+  momentum:       0.15
+  microstructure: 0.20
+  volatility:     0.15
+  sentiment:      0.10
+  cvd:            0.15
+  vwap:           0.05
+  whale:          0.05
+
+scoring:
+  observation_threshold: 0.45
+  execution_threshold: 0.72
+
+risk:
+  max_daily_loss_pct: 0.05
+  max_open_trades: 3
+  circuit_breaker_losses: 3
+  circuit_breaker_drawdown: 0.15
+  circuit_breaker_win_rate: 0.55
+  circuit_breaker_no_opp_hours: 2
+  volatility_pause_seconds: 300
+  max_api_latency_ms: 200
+
+regime:
+  scan_interval_seconds: 30
+  volatile_atr_multiplier: 2.0
+  trending_score_threshold: 0.4
+  funding_rich_rate: 0.0008
+
+pairs:
+  scan_universe:
+    - POL/USDT
+    - LINK/USDT
+    - ADA/USDT
+    - DOT/USDT
+    - AVAX/USDT
+    - NEAR/USDT
+    - APT/USDT
+    - INJ/USDT
+    - ARB/USDT
+    - OP/USDT
+    - TIA/USDT
+    - SEI/USDT
+    - ATOM/USDT
+    - LTC/USDT
+    - XRP/USDT
+    - DOGE/USDT
+    - BONK/USDT
+    - WIF/USDT
+    - FLOKI/USDT
+    - SOL/USDT
+    - UNI/USDT
+    - AAVE/USDT
+    - FIL/USDT
+    - LDO/USDT
+    - SNX/USDT
+    - 1INCH/USDT
+    - RAY/USDT
+    - JTO/USDT
+    - PYTH/USDT
+    - PEPE/USDT
+
+triangular_paths:
+  - [USDT, POL, ETH, USDT]
+  - [USDT, LINK, ETH, USDT]
+  - [USDT, UNI, ETH, USDT]
+  - [USDT, AAVE, ETH, USDT]
+  - [USDT, ARB, ETH, USDT]
+  - [USDT, OP, ETH, USDT]
+  - [USDT, FIL, ETH, USDT]
+  - [USDT, LDO, ETH, USDT]
+  - [USDT, SNX, ETH, USDT]
+  - [USDT, ADA, BTC, USDT]
+  - [USDT, DOT, BTC, USDT]
+  - [USDT, ATOM, BTC, USDT]
+  - [USDT, LTC, BTC, USDT]
+  - [USDT, XRP, BTC, USDT]
+  - [USDT, NEAR, BTC, USDT]
+  - [USDT, APT, BTC, USDT]
+  - [USDT, INJ, BNB, USDT]
+  - [USDT, SEI, BNB, USDT]
+  - [USDT, RAY, SOL, USDT]
+  - [USDT, JTO, SOL, USDT]
+
+grid_pairs:
+  - POL/USDT
+  - LINK/USDT
+  - ADA/USDT
+  - DOT/USDT
+  - AVAX/USDT
+
+learning:
+  run_hour: 0
+  max_weight_change_per_day: 0.02
+  promote_win_rate: 0.65
+  demote_win_rate: 0.45
+  min_trades_for_ranking: 10
+
+logging:
+  level: INFO
+  opportunity_log: data/opportunity_log.csv
+  trade_log: data/trade_log.csv
+  regime_log: data/regime_log.csv
+  reports_dir: reports/daily/

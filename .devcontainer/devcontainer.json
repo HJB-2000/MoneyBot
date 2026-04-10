@@ -1,0 +1,30 @@
+{
+  "name": "MoneyBot",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "MoneyBot Keep-Alive",
+      "visibility": "public",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "onCreateCommand": "pip install -r requirements.txt && pip install fastapi uvicorn",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}
