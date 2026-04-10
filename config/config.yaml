@@ -124,17 +124,17 @@ pairs:
     - PEPE/USDT
 
 triangular_paths:
-  # Only pairs that actually exist on Binance spot
-  - [USDT, ETH, BTC, USDT]
-  - [USDT, BNB, BTC, USDT]
-  - [USDT, BNB, ETH, USDT]
-  - [USDT, XRP, BTC, USDT]
-  - [USDT, ADA, BTC, USDT]
-  - [USDT, DOT, BTC, USDT]
-  - [USDT, LTC, BTC, USDT]
-  - [USDT, LINK, BTC, USDT]
-  - [USDT, ATOM, BTC, USDT]
-  - [USDT, DOGE, BTC, USDT]
+  # Format: [USDT, coin_a, coin_b, USDT] → cross pair = coin_b/coin_a (must exist on Binance)
+  - [USDT, BTC, ETH, USDT]    # ETH/BTC ✓
+  - [USDT, BTC, BNB, USDT]    # BNB/BTC ✓
+  - [USDT, ETH, BNB, USDT]    # BNB/ETH ✓
+  - [USDT, BTC, XRP, USDT]    # XRP/BTC ✓
+  - [USDT, BTC, ADA, USDT]    # ADA/BTC ✓
+  - [USDT, BTC, DOT, USDT]    # DOT/BTC ✓
+  - [USDT, BTC, LTC, USDT]    # LTC/BTC ✓
+  - [USDT, BTC, LINK, USDT]   # LINK/BTC ✓
+  - [USDT, BTC, ATOM, USDT]   # ATOM/BTC ✓
+  - [USDT, BTC, DOGE, USDT]   # DOGE/BTC ✓
 
 grid_pairs:
   - POL/USDT
