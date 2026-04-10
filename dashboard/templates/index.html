@@ -168,15 +168,24 @@
   </div>
 </div>
 
-<!-- Signal snapshot + Bot log -->
+<!-- Confidence chart + Signal snapshot -->
 <div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Confidence Over Time <span style="color:var(--muted);font-size:10px">(last 100 cycles)</span></div>
+    <canvas id="conf-chart" style="width:100%;height:120px"></canvas>
+    <div id="conf-stats" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+  </div>
   <div class="card">
     <div class="card-title">Signal Snapshot</div>
     <div id="signal-snapshot"><span style="color:var(--muted)">Loading…</span></div>
   </div>
+</div>
+
+<!-- Bot activity log -->
+<div class="grid" style="grid-template-columns:1fr">
   <div class="card">
-    <div class="card-title">Bot Log <span style="color:var(--muted);font-size:10px">(last 50 lines)</span></div>
-    <pre id="bot-log" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">(loading…)</pre>
+    <div class="card-title">Bot Activity Log <span style="color:var(--muted);font-size:10px">(last 80 lines, excludes dashboard pings)</span></div>
+    <pre id="bot-log" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">(loading…)</pre>
   </div>
 </div>
 
@@ -391,10 +400,91 @@ async function updateSignalsAndLog() {
   } catch (e) {}
 }
 
+// ── confidence chart ────────────────────────────────────────────────────────
+function drawConfChart(canvas, data) {
+  if (!data.length) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const points = data.map(d => d.confidence);
+  const min = 0, max = 1;
+  const pad = { t: 8, b: 18, l: 36, r: 8 };
+  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Threshold line at 0.4
+  const y04 = pad.t + ch - (0.4 / 1) * ch;
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#eab308';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, y04); ctx.lineTo(pad.l + cw, y04); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, 'rgba(168,85,247,.35)');
+  grad.addColorStop(1, 'rgba(168,85,247,0)');
+
+  const xs = i => pad.l + (i / (points.length - 1 || 1)) * cw;
+  const ys = v => pad.t + ch - (v / 1) * ch;
+
+  ctx.beginPath();
+  ctx.moveTo(xs(0), ys(points[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
+  ctx.lineTo(xs(points.length - 1), pad.t + ch);
+  ctx.lineTo(xs(0), pad.t + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xs(0), ys(points[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
+  ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2; ctx.stroke();
+
+  // Y labels
+  ctx.fillStyle = '#64748b'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+  ctx.fillText('100%', pad.l - 3, pad.t + 8);
+  ctx.fillText('40%',  pad.l - 3, y04 + 4);
+  ctx.fillText('0%',   pad.l - 3, pad.t + ch);
+}
+
+async function updateConfidence() {
+  try {
+    const res = await fetch('/api/confidence');
+    const d = await res.json();
+    const history = d.history || [];
+    if (!history.length) return;
+
+    drawConfChart(document.getElementById('conf-chart'), history);
+
+    const confs = history.map(h => h.confidence);
+    const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
+    const trend = confs.length > 5
+      ? confs.slice(-5).reduce((a,b)=>a+b,0)/5 - confs.slice(0,5).reduce((a,b)=>a+b,0)/5
+      : 0;
+    const trendStr = trend > 0.01 ? '↑ improving' : trend < -0.01 ? '↓ declining' : '→ stable';
+    const trendColor = trend > 0.01 ? 'var(--green)' : trend < -0.01 ? 'var(--red)' : 'var(--muted)';
+    const latest = confs[confs.length - 1];
+    document.getElementById('conf-stats').innerHTML =
+      `Avg: <strong>${(avg*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
+      `Latest: <strong>${(latest*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
+      `Trend: <span style="color:${trendColor}">${trendStr}</span> &nbsp;|&nbsp; ` +
+      `<span style="color:var(--yellow)">— = 40% threshold</span>`;
+  } catch(e) {}
+}
+
 update();
 setInterval(update, 5000);
 updateSignalsAndLog();
 setInterval(updateSignalsAndLog, 10000);
+updateConfidence();
+setInterval(updateConfidence, 15000);
+window.addEventListener('resize', updateConfidence);
 window.addEventListener('resize', () => {
   fetch('/api/status').then(r => r.json()).then(d => {
     const pts = d.capital.history.map(h => h.balance);

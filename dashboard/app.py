@@ -130,11 +130,27 @@ def _recent_opps(n: int = 10) -> list[dict]:
     return out
 
 
-def _bot_log_tail(n: int = 50) -> list[str]:
+def _bot_log_tail(n: int = 80) -> list[str]:
     if not BOT_LOG.exists() or BOT_LOG.stat().st_size == 0:
         return ["(no log yet)"]
     lines = BOT_LOG.read_text(errors="replace").splitlines()
-    return lines[-n:]
+    # Filter out noisy dashboard HTTP request lines — keep only meaningful bot activity
+    filtered = [l for l in lines if "GET /api/status" not in l and "GET / HTTP" not in l]
+    return filtered[-n:]
+
+
+def _confidence_history(n: int = 100) -> list[dict]:
+    """Last N regime rows for confidence-over-time chart."""
+    rows = _read_csv_tail(REGIME_LOG, n)
+    out = []
+    for r in rows:
+        out.append({
+            "ts":         r.get("timestamp", "")[:19],
+            "confidence": _safe_float(r.get("confidence")),
+            "score":      _safe_float(r.get("score")),
+            "regime":     r.get("regime", "UNKNOWN"),
+        })
+    return out
 
 
 def _signal_history() -> dict:
@@ -187,6 +203,10 @@ def create_app() -> Flask:
     @app.route("/api/logs")
     def logs():
         return jsonify({"lines": _bot_log_tail(80)})
+
+    @app.route("/api/confidence")
+    def confidence():
+        return jsonify({"history": _confidence_history(100)})
 
     @app.route("/api/signals")
     def signals():
