@@ -121,7 +121,7 @@ class FuturesSignals:
     def _calc_vwap(self, candles: pd.DataFrame) -> float:
         df = candles.copy()
         if "timestamp" in df.columns and pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-            today_start = pd.Timestamp.now("UTC").normalize()
+            today_start = pd.Timestamp.now().normalize()  # tz-naive to match candle timestamps
             today_df = df[df["timestamp"] >= today_start]
             if len(today_df) > 0:
                 df = today_df
