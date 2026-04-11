@@ -92,6 +92,8 @@ regime:
 
 pairs:
   scan_universe:
+    - BTC/USDT
+    - ETH/USDT
     - POL/USDT
     - LINK/USDT
     - ADA/USDT

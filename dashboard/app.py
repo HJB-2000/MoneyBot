@@ -221,6 +221,16 @@ def create_app() -> Flask:
                 pass
         return jsonify({"candles": []})
 
+    @app.route("/api/bayes")
+    def bayes():
+        f = ROOT / "data" / "live_bayes_votes.json"
+        if f.exists() and f.stat().st_size > 0:
+            try:
+                return jsonify(json.loads(f.read_text()))
+            except Exception:
+                pass
+        return jsonify({"votes": [], "regime": "UNKNOWN"})
+
     @app.route("/api/signals30")
     def signals30():
         if LIVE_SIGNALS_30.exists() and LIVE_SIGNALS_30.stat().st_size > 0:

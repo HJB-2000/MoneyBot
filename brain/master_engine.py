@@ -109,6 +109,10 @@ class MasterEngine:
         self._futures_sig  = FuturesSignals()
         self._derived_sig  = DerivedSignals()
 
+        # Bayesian network (for live vote dashboard panel)
+        from bayesian.network import BayesianNetwork
+        self._bayes_net = BayesianNetwork()
+
         # Threading
         self.brain_queue: queue.Queue = queue.Queue(maxsize=1)
         self.opp_queue: queue.Queue = queue.Queue(maxsize=50)
@@ -280,9 +284,49 @@ class MasterEngine:
                 # Write live signal scores
                 with open(os.path.join(_data_dir, "live_signals_30.json"), "w") as _f:
                     _json.dump(self._current_signals_30, _f)
-                # Write live market candles (last 50) for volume chart
+
+                # Write live Bayesian votes for all 7 strategies
+                try:
+                    _strategies = [
+                        "triangular_arb", "stat_arb", "funding_arb",
+                        "grid_trader", "mean_reversion", "volume_spike",
+                        "correlation_breakout",
+                    ]
+                    _votes = []
+                    for _s in _strategies:
+                        _ex = self._bayes_net.explain(
+                            self._current_signals_30, _s, regime, "neutral"
+                        )
+                        _votes.append({
+                            "strategy":    _s,
+                            "probability": _ex.get("final_probability", 0.0),
+                            "prior":       _ex.get("prior", 0.5),
+                            "decision":    _ex.get("decision", "OBSERVE"),
+                            "key_signals": _ex.get("key_signals", []),
+                            "vetoed":      _ex.get("vetoes_checked") == "triggered",
+                        })
+                    with open(os.path.join(_data_dir, "live_bayes_votes.json"), "w") as _f:
+                        _json.dump({"votes": _votes, "regime": regime}, _f)
+                except Exception:
+                    pass
+                # Write live market data: candles + per-pair 24h volume
+                _pairs = self.config.get("pairs", {}).get("scan_universe", [sym])
+                _pair_vols = []
+                for _p in _pairs:
+                    try:
+                        _ticker = mr.get_ticker(_p)
+                        if _ticker:
+                            _change = _ticker.get("percentage", 0) or 0
+                            _pair_vols.append({
+                                "symbol":     _p,
+                                "vol_24h":    float(_ticker.get("quoteVolume") or 0),
+                                "price":      float(_ticker.get("last") or 0),
+                                "change_pct": float(_change),
+                            })
+                    except Exception:
+                        pass
+                _candle_rows = []
                 if candles is not None and len(candles) >= 1:
-                    _candle_rows = []
                     for _, row in candles.tail(50).iterrows():
                         _candle_rows.append({
                             "ts":     str(row["timestamp"])[:19],
@@ -290,8 +334,12 @@ class MasterEngine:
                             "close":  float(row["close"]),
                             "volume": float(row["volume"]),
                         })
-                    with open(os.path.join(_data_dir, "live_market.json"), "w") as _f:
-                        _json.dump({"candles": _candle_rows, "symbol": sym}, _f)
+                with open(os.path.join(_data_dir, "live_market.json"), "w") as _f:
+                    _json.dump({
+                        "candles": _candle_rows,
+                        "symbol":  sym,
+                        "pairs":   _pair_vols,
+                    }, _f)
             except Exception:
                 pass
         except Exception as e:

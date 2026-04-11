@@ -79,6 +79,30 @@
   /* Capital chart */
   #cap-chart { width: 100%; height: 120px; }
 
+  /* Bayesian vote cards */
+  .vote-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .vote-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .vote-name { font-size: 12px; font-weight: 600; color: var(--text); text-transform: capitalize; }
+  .vote-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: .05em; }
+  .vote-badge-EXECUTE  { background: rgba(34,197,94,.2);   color: var(--green); }
+  .vote-badge-OBSERVE  { background: rgba(234,179,8,.2);   color: var(--yellow); }
+  .vote-badge-BLOCKED  { background: rgba(239,68,68,.2);   color: var(--red); }
+  .vote-meter-wrap { background: var(--border); border-radius: 4px; height: 10px; overflow: hidden; position: relative; }
+  .vote-meter-bar  { height: 100%; border-radius: 4px; transition: width .6s; }
+  /* threshold marker at 55% */
+  .vote-meter-wrap::after { content:''; position:absolute; left:55%; top:0; width:2px; height:100%; background:rgba(255,255,255,.25); }
+  .vote-prob { font-size: 13px; font-weight: 700; text-align: right; margin-top: 4px; }
+  .vote-signals { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .vote-sig-chip { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,.06); color: var(--muted); }
+
+  /* Universe volume bar chart */
+  .uni-vol-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .uni-vol-label { width: 90px; font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; }
+  .uni-vol-bar-wrap { flex: 1; background: var(--border); border-radius: 3px; height: 12px; overflow: hidden; }
+  .uni-vol-bar { height: 100%; border-radius: 3px; transition: width .5s; }
+  .uni-vol-val { width: 58px; font-size: 11px; text-align: right; flex-shrink: 0; }
+  .uni-vol-chg { width: 48px; font-size: 10px; text-align: right; flex-shrink: 0; }
+
   /* Confidence bar */
   .conf-wrap { background: var(--border); border-radius: 4px; height: 8px; margin-top: 6px; overflow: hidden; }
   .conf-bar { height: 100%; border-radius: 4px; transition: width .4s; }
@@ -160,6 +184,19 @@
   </div>
 </div>
 
+<!-- Bayesian Vote Panel -->
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <div class="card-title">
+      Bayesian Vote
+      <span style="color:var(--muted);font-size:10px;margin-left:8px">P(win) per strategy · current signals · updates every 10s</span>
+    </div>
+    <div id="bayes-votes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px 24px;margin-top:4px">
+      <span style="color:var(--muted);font-size:12px">Loading…</span>
+    </div>
+  </div>
+</div>
+
 <!-- Capital + Confidence + Volume charts -->
 <div class="grid grid-3">
   <div class="card">
@@ -172,9 +209,8 @@
     <div id="conf-stats" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
   </div>
   <div class="card">
-    <div class="card-title">Market Volume <span style="color:var(--muted);font-size:10px" id="vol-symbol">(SOL/USDT · last 50 candles)</span></div>
-    <canvas id="vol-chart" style="width:100%;height:120px"></canvas>
-    <div id="vol-stats" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+    <div class="card-title">Universe Volume <span style="color:var(--muted);font-size:10px" id="vol-total">(24h · all 32 pairs)</span></div>
+    <div id="universe-vol" style="max-height:160px;overflow-y:auto"><span style="color:var(--muted);font-size:12px">Loading…</span></div>
   </div>
 </div>
 
@@ -469,16 +505,18 @@ async function update() {
 // ── signals30 + log + confidence (every 10s) ───────────────────────────────
 async function updateAll() {
   try {
-    const [sigRes, logRes, confRes, sig30Res] = await Promise.all([
+    const [sigRes, logRes, confRes, sig30Res, bayesRes] = await Promise.all([
       fetch('/api/signals'),
       fetch('/api/logs'),
       fetch('/api/confidence'),
       fetch('/api/signals30'),
+      fetch('/api/bayes'),
     ]);
     const sig   = await sigRes.json();
     const log   = await logRes.json();
     const confD = await confRes.json();
     const sig30 = await sig30Res.json();
+    const bayes = await bayesRes.json();
 
     // Signal snapshot
     const snap = document.getElementById('signal-snapshot');
@@ -502,6 +540,9 @@ async function updateAll() {
         </div>
         <div class="weight-row"><span class="weight-label">Updated</span><span style="color:var(--muted)">${sig.ts.slice(11,19)}</span></div>`;
     }
+
+    // Bayesian votes
+    renderBayesVotes(bayes);
 
     // 30 signals chart
     render30Signals(sig30);
@@ -580,72 +621,96 @@ function drawConfChart(canvas, data) {
   ctx.fillText('0%',   pad.l - 3, pad.t + ch);
 }
 
-// ── volume bar chart ───────────────────────────────────────────────────────
-function drawVolChart(canvas, candles) {
-  if (!candles || !candles.length) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.scale(dpr, dpr);
+// ── Bayesian vote panel ────────────────────────────────────────────────────
+function renderBayesVotes(data) {
+  const wrap = document.getElementById('bayes-votes');
+  const votes = data.votes || [];
+  if (!votes.length) {
+    wrap.innerHTML = '<span style="color:var(--muted);font-size:12px">Waiting for first scan cycle…</span>';
+    return;
+  }
 
-  const vols = candles.map(c => c.volume);
-  const closes = candles.map(c => c.close);
-  const opens = candles.map(c => c.open);
-  const maxVol = Math.max(...vols) || 1;
-  const avgVol = vols.reduce((a,b)=>a+b,0) / vols.length;
+  const sorted = [...votes].sort((a,b) => b.probability - a.probability);
 
-  const pad = { t: 8, b: 20, l: 42, r: 8 };
-  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
-  const barW = Math.max(1, cw / candles.length - 1);
+  wrap.innerHTML = sorted.map(v => {
+    const pct = (v.probability * 100).toFixed(1);
+    const barColor = v.vetoed   ? 'var(--red)'
+                   : v.probability >= 0.55 ? 'var(--green)'
+                   : v.probability >= 0.30 ? 'var(--yellow)'
+                   : 'var(--muted)';
+    const decision = v.vetoed ? 'BLOCKED' : v.decision;
+    const name = v.strategy.replace(/_/g, ' ');
+    const prior = (v.prior * 100).toFixed(0);
 
-  ctx.clearRect(0, 0, W, H);
+    const chips = v.key_signals.slice(0, 4).map(s => {
+      const isPos = s.includes('(+');
+      const chipColor = isPos ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+      const textColor = isPos ? 'var(--green)' : 'var(--red)';
+      // Extract just signal name
+      const sigName = s.split('(')[0].trim().replace(/_/g,' ');
+      return `<span class="vote-sig-chip" style="background:${chipColor};color:${textColor}">${sigName}</span>`;
+    }).join('');
 
-  // Avg volume line
-  const avgY = pad.t + ch - (avgVol / maxVol) * ch;
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = '#eab308'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad.l, avgY); ctx.lineTo(pad.l + cw, avgY); ctx.stroke();
-  ctx.setLineDash([]);
+    return `<div class="vote-card">
+      <div class="vote-header">
+        <span class="vote-name">${name}</span>
+        <span class="vote-badge vote-badge-${decision}">${decision}</span>
+      </div>
+      <div class="vote-meter-wrap">
+        <div class="vote-meter-bar" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+      <div class="vote-prob" style="color:${barColor}">${pct}%
+        <span style="font-size:10px;color:var(--muted);font-weight:400"> prior ${prior}%</span>
+      </div>
+      ${chips ? `<div class="vote-signals">${chips}</div>` : ''}
+    </div>`;
+  }).join('');
+}
 
-  candles.forEach((c, i) => {
-    const x = pad.l + (i / candles.length) * cw;
-    const h = (c.volume / maxVol) * ch;
-    const y = pad.t + ch - h;
-    const isGreen = c.close >= c.open;
-    const isSpike = c.volume > avgVol * 2;
-    ctx.fillStyle = isSpike
-      ? (isGreen ? 'rgba(234,179,8,.9)' : 'rgba(239,68,68,.9)')   // spike = yellow/red
-      : (isGreen ? 'rgba(34,197,94,.6)' : 'rgba(239,68,68,.4)');  // normal = green/red
-    ctx.fillRect(x, y, Math.max(barW, 1), h);
-  });
-
-  // Y labels
-  ctx.fillStyle = '#64748b'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
-  const fmt = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v.toFixed(0);
-  ctx.fillText(fmt(maxVol), pad.l - 3, pad.t + 10);
-  ctx.fillText(fmt(avgVol), pad.l - 3, avgY + 4);
+// ── universe volume chart ──────────────────────────────────────────────────
+// 32 unique colors, one per pair
+const PAIR_COLORS = [
+  '#06b6d4','#a855f7','#22c55e','#f59e0b','#3b82f6','#ef4444','#ec4899','#14b8a6',
+  '#8b5cf6','#84cc16','#f97316','#06b6d4','#d946ef','#0ea5e9','#10b981','#fbbf24',
+  '#6366f1','#e11d48','#64748b','#7c3aed','#059669','#dc2626','#2563eb','#9333ea',
+  '#16a34a','#ca8a04','#0891b2','#7e22ce','#15803d','#b91c1c','#1d4ed8','#6d28d9',
+];
+function fmtVol(v) {
+  if (v >= 1e9) return (v/1e9).toFixed(2)+'B';
+  if (v >= 1e6) return (v/1e6).toFixed(1)+'M';
+  if (v >= 1e3) return (v/1e3).toFixed(0)+'K';
+  return v.toFixed(0);
 }
 
 async function updateVolume() {
   try {
     const res = await fetch('/api/volume');
     const d = await res.json();
-    const candles = d.candles || [];
-    if (!candles.length) return;
+    const pairs = (d.pairs || []).filter(p => p.vol_24h > 0);
+    if (!pairs.length) return;
 
-    drawVolChart(document.getElementById('vol-chart'), candles);
+    const sorted = [...pairs].sort((a,b) => b.vol_24h - a.vol_24h);
+    const maxVol = sorted[0].vol_24h;
+    const totalVol = sorted.reduce((s,p) => s+p.vol_24h, 0);
 
-    const vols = candles.map(c => c.volume);
-    const avg = vols.reduce((a,b)=>a+b,0) / vols.length;
-    const latest = vols[vols.length - 1];
-    const spikes = vols.filter(v => v > avg * 2).length;
-    const spikeColor = spikes > 3 ? 'var(--red)' : spikes > 0 ? 'var(--yellow)' : 'var(--green)';
-    document.getElementById('vol-stats').innerHTML =
-      `Avg: <strong>${latest > 1e6 ? (avg/1e6).toFixed(2)+'M' : (avg/1e3).toFixed(1)+'K'}</strong> &nbsp;|&nbsp; ` +
-      `Latest: <strong>${latest > 1e6 ? (latest/1e6).toFixed(2)+'M' : (latest/1e3).toFixed(1)+'K'}</strong> &nbsp;|&nbsp; ` +
-      `Spikes: <span style="color:${spikeColor}">${spikes}</span> &nbsp;|&nbsp; ` +
-      `<span style="color:var(--yellow)">— = avg</span>`;
+    document.getElementById('vol-total').textContent =
+      `(24h · ${sorted.length} pairs · total $${fmtVol(totalVol)})`;
+
+    const wrap = document.getElementById('universe-vol');
+    wrap.innerHTML = sorted.map((p, i) => {
+      const pct = (p.vol_24h / maxVol * 100).toFixed(1);
+      const color = PAIR_COLORS[i % PAIR_COLORS.length];
+      const chgColor = p.change_pct > 0 ? 'var(--green)' : p.change_pct < 0 ? 'var(--red)' : 'var(--muted)';
+      const label = p.symbol.replace('/USDT','');
+      return `<div class="uni-vol-row">
+        <span class="uni-vol-label">${label}</span>
+        <div class="uni-vol-bar-wrap">
+          <div class="uni-vol-bar" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <span class="uni-vol-val" style="color:${color}">${fmtVol(p.vol_24h)}</span>
+        <span class="uni-vol-chg" style="color:${chgColor}">${p.change_pct >= 0 ? '+' : ''}${p.change_pct.toFixed(2)}%</span>
+      </div>`;
+    }).join('');
   } catch(e) {}
 }
 
@@ -670,9 +735,6 @@ window.addEventListener('resize', () => {
   }).catch(()=>{});
   fetch('/api/confidence').then(r=>r.json()).then(d=>{
     if (d.history && d.history.length) drawConfChart(document.getElementById('conf-chart'), d.history);
-  }).catch(()=>{});
-  fetch('/api/volume').then(r=>r.json()).then(d=>{
-    if (d.candles && d.candles.length) drawVolChart(document.getElementById('vol-chart'), d.candles);
   }).catch(()=>{});
 });
 </script>
