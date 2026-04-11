@@ -45,12 +45,28 @@ class StatArbStrategy(BaseStrategy):
         trade_size = capital * config["capital"]["max_position_pct"] * size_mult
         trade_size = max(trade_size, 5.0)
 
+        # Batch-fetch all unique tickers in parallel (was 2× get_ticker per pair = dozens of serial calls)
+        unique_syms = {s for pair in self._corr_pairs for s in pair}
+        ticker_cache: dict = {}
+        with ThreadPoolExecutor(max_workers=min(len(unique_syms), 12)) as pool:
+            fut_map = {pool.submit(market_reader.get_ticker, sym): sym for sym in unique_syms}
+            done, _ = wait(list(fut_map.keys()), timeout=8)
+        for f in done:
+            sym = fut_map[f]
+            try:
+                result = f.result()
+                if result:
+                    ticker_cache[sym] = result
+            except Exception:
+                pass
+
         opportunities = []
         for (sym_a, sym_b), stats in self._corr_pairs.items():
             try:
                 opp = self._check_divergence(
                     sym_a, sym_b, stats, trade_size,
-                    market_reader, cfg, regime, bias
+                    market_reader, cfg, regime, bias,
+                    ticker_cache=ticker_cache
                 )
                 if opp:
                     opportunities.append(opp)
@@ -116,9 +132,10 @@ class StatArbStrategy(BaseStrategy):
 
     def _check_divergence(self, sym_a: str, sym_b: str, stats: dict,
                            trade_size: float, market_reader, cfg: dict,
-                           regime: str, bias: str):
-        ticker_a = market_reader.get_ticker(sym_a)
-        ticker_b = market_reader.get_ticker(sym_b)
+                           regime: str, bias: str, ticker_cache: dict = None):
+        cache = ticker_cache or {}
+        ticker_a = cache.get(sym_a) or market_reader.get_ticker(sym_a)
+        ticker_b = cache.get(sym_b) or market_reader.get_ticker(sym_b)
         if not ticker_a or not ticker_b:
             return None
 
