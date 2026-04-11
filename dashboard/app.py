@@ -8,7 +8,10 @@ import csv
 import json
 import os
 import sqlite3
+import time
 from pathlib import Path
+
+_START_TIME = time.time()
 
 from flask import Flask, jsonify, render_template
 
@@ -21,7 +24,8 @@ REGIME_LOG     = ROOT / "data" / "regime_log.csv"
 OPP_LOG        = ROOT / "data" / "opportunity_log.csv"
 WEIGHTS_FILE   = ROOT / "data" / "signal_weights.json"
 PAIR_CSV       = ROOT / "data" / "pair_rankings.csv"
-BOT_LOG        = ROOT / "logs" / "bot.log"
+BOT_LOG          = ROOT / "logs" / "bot.log"
+LIVE_SIGNALS_30  = ROOT / "data" / "live_signals_30.json"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -199,6 +203,22 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         return render_template("index.html")
+
+    @app.route("/api/uptime")
+    def uptime():
+        secs = int(time.time() - _START_TIME)
+        h, rem = divmod(secs, 3600)
+        m, s = divmod(rem, 60)
+        return jsonify({"seconds": secs, "display": f"{h:02d}:{m:02d}:{s:02d}"})
+
+    @app.route("/api/signals30")
+    def signals30():
+        if LIVE_SIGNALS_30.exists() and LIVE_SIGNALS_30.stat().st_size > 0:
+            try:
+                return jsonify(json.loads(LIVE_SIGNALS_30.read_text()))
+            except Exception:
+                pass
+        return jsonify({})
 
     @app.route("/api/logs")
     def logs():

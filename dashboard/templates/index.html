@@ -20,11 +20,29 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
-  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
-  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); }
+
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); white-space: nowrap; }
   #status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
   #status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
   #last-update { color: var(--muted); font-size: 12px; }
+
+  /* Uptime timer */
+  #uptime-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(6,182,212,.08); border: 1px solid rgba(6,182,212,.2);
+    border-radius: 8px; padding: 6px 14px;
+  }
+  #uptime-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+  #uptime-display { font-size: 20px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 
   .grid { display: grid; gap: 16px; padding: 20px; }
   .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -32,7 +50,7 @@
   .grid-2 { grid-template-columns: repeat(2, 1fr); }
 
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-  .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
   .card-value { font-size: 28px; font-weight: 700; }
   .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
@@ -40,7 +58,6 @@
   .neg { color: var(--red); }
   .neutral { color: var(--text); }
 
-  /* Regime badge */
   .regime-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
   .regime-VOLATILE      { background: rgba(239,68,68,.2);  color: #ef4444; }
   .regime-TRENDING_UP   { background: rgba(34,197,94,.2);  color: #22c55e; }
@@ -52,12 +69,12 @@
   .regime-WHALE_MOVING  { background: rgba(6,182,212,.2);  color: #06b6d4; }
   .regime-UNKNOWN       { background: rgba(100,116,139,.2);color: #94a3b8; }
 
-  /* Bar chart for weights */
+  /* Weight bars (for signal weights panel) */
   .weight-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-  .weight-label { width: 110px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .weight-label { width: 130px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
   .weight-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 10px; overflow: hidden; }
-  .weight-bar { height: 100%; background: var(--cyan); border-radius: 4px; transition: width .4s; }
-  .weight-val { width: 38px; text-align: right; font-size: 12px; color: var(--text); }
+  .weight-bar { height: 100%; background: var(--cyan); border-radius: 4px; transition: width .5s; }
+  .weight-val { width: 42px; text-align: right; font-size: 12px; color: var(--text); }
 
   /* Capital chart */
   #cap-chart { width: 100%; height: 120px; }
@@ -83,6 +100,18 @@
   .tier-B { color: var(--yellow); font-weight: 700; }
   .tier-C { color: var(--red);    font-weight: 700; }
 
+  /* 30-signal chart rows */
+  .sig30-group { margin-bottom: 14px; }
+  .sig30-group-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .sig30-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .sig30-name { width: 160px; font-size: 11px; color: var(--muted); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sig30-bar-wrap { flex: 1; position: relative; background: var(--border); border-radius: 4px; height: 14px; overflow: hidden; }
+  /* center line */
+  .sig30-bar-wrap::after { content:''; position:absolute; left:50%; top:0; width:1px; height:100%; background: rgba(255,255,255,.1); }
+  .sig30-bar-pos { position: absolute; left: 50%; top: 0; height: 100%; background: var(--green); border-radius: 0 4px 4px 0; transition: width .4s; }
+  .sig30-bar-neg { position: absolute; right: 50%; top: 0; height: 100%; background: var(--red); border-radius: 4px 0 0 4px; transition: width .4s; }
+  .sig30-val { width: 48px; text-align: right; font-size: 11px; font-weight: 600; }
+
   @media (max-width: 900px) {
     .grid-4 { grid-template-columns: repeat(2, 1fr); }
     .grid-3 { grid-template-columns: 1fr; }
@@ -94,6 +123,10 @@
 
 <header>
   <h1>&#9889; MoneyBot</h1>
+  <div id="uptime-wrap">
+    <span id="uptime-label">Active</span>
+    <span id="uptime-display">00:00:00</span>
+  </div>
   <div>
     <span id="status-dot"></span>
     <span id="last-update">Connecting…</span>
@@ -127,15 +160,41 @@
   </div>
 </div>
 
-<!-- Chart + Weights + Regime detail -->
-<div class="grid grid-3">
-  <div class="card" style="grid-column: span 2">
+<!-- Capital + Confidence charts -->
+<div class="grid grid-2">
+  <div class="card">
     <div class="card-title">Capital History</div>
     <canvas id="cap-chart"></canvas>
   </div>
   <div class="card">
-    <div class="card-title">Signal Weights</div>
+    <div class="card-title">Confidence Over Time <span style="color:var(--muted);font-size:10px">(last 100 cycles)</span></div>
+    <canvas id="conf-chart" style="width:100%;height:120px"></canvas>
+    <div id="conf-stats" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- 30 Live Signals chart — full width, big -->
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <div class="card-title">
+      30 Live Signals
+      <span style="color:var(--muted);font-size:10px;margin-left:8px">green = bullish &nbsp;|&nbsp; red = bearish &nbsp;|&nbsp; updates every 10s</span>
+    </div>
+    <div id="signals30-chart" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0 32px">
+      <div style="color:var(--muted);font-size:12px">Loading signals…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Signal weights (live updating) -->
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Signal Weights <span style="color:var(--muted);font-size:10px">(live)</span></div>
     <div id="weights-chart"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Signal Snapshot</div>
+    <div id="signal-snapshot"><span style="color:var(--muted)">Loading…</span></div>
   </div>
 </div>
 
@@ -168,28 +227,24 @@
   </div>
 </div>
 
-<!-- Confidence chart + Signal snapshot -->
-<div class="grid grid-2">
-  <div class="card">
-    <div class="card-title">Confidence Over Time <span style="color:var(--muted);font-size:10px">(last 100 cycles)</span></div>
-    <canvas id="conf-chart" style="width:100%;height:120px"></canvas>
-    <div id="conf-stats" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
-  </div>
-  <div class="card">
-    <div class="card-title">Signal Snapshot</div>
-    <div id="signal-snapshot"><span style="color:var(--muted)">Loading…</span></div>
-  </div>
-</div>
-
-<!-- Bot activity log -->
+<!-- Bot activity log — full width -->
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card">
-    <div class="card-title">Bot Activity Log <span style="color:var(--muted);font-size:10px">(last 80 lines, excludes dashboard pings)</span></div>
-    <pre id="bot-log" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">(loading…)</pre>
+    <div class="card-title">Bot Activity Log <span style="color:var(--muted);font-size:10px">(last 80 lines)</span></div>
+    <pre id="bot-log" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">(loading…)</pre>
   </div>
 </div>
 
 <script>
+// ── signal group definitions (for labelling) ───────────────────────────────
+const SIG_GROUPS = {
+  "Candle": ["RSI","MACD","EMA_cross","ATR_ratio","bollinger_state","rate_of_change","support_resistance","trend_structure","consolidation_score","realized_vol"],
+  "Order Book": ["bid_ask_imbalance","depth_ratio","large_order_detection","spread_penalty","book_pressure"],
+  "Trades": ["buy_sell_ratio","trade_momentum","volume_delta","large_trade_impact","trade_frequency"],
+  "Futures": ["funding_sentiment","oi_trend","liquidation_pressure","basis_signal","futures_volume_delta"],
+  "Derived": ["trend_confirmation","vol_adjusted_signal","composite_momentum","regime_alignment","signal_divergence"],
+};
+
 // ── tiny canvas line chart ──────────────────────────────────────────────────
 function drawChart(canvas, points) {
   if (!points.length) return;
@@ -206,7 +261,6 @@ function drawChart(canvas, points) {
 
   ctx.clearRect(0, 0, W, H);
 
-  // Gradient fill
   const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
   grad.addColorStop(0, 'rgba(6,182,212,.3)');
   grad.addColorStop(1, 'rgba(6,182,212,0)');
@@ -220,21 +274,14 @@ function drawChart(canvas, points) {
   ctx.lineTo(xs(points.length - 1), pad.t + ch);
   ctx.lineTo(xs(0), pad.t + ch);
   ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
+  ctx.fillStyle = grad; ctx.fill();
 
-  // Line
   ctx.beginPath();
   ctx.moveTo(xs(0), ys(points[0]));
   for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
-  ctx.strokeStyle = '#06b6d4';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2; ctx.stroke();
 
-  // Labels
-  ctx.fillStyle = '#64748b';
-  ctx.font = '11px system-ui';
-  ctx.textAlign = 'right';
+  ctx.fillStyle = '#64748b'; ctx.font = '11px system-ui'; ctx.textAlign = 'right';
   ctx.fillText('$' + max.toFixed(2), pad.l - 4, pad.t + 8);
   ctx.fillText('$' + min.toFixed(2), pad.l - 4, pad.t + ch);
   ctx.fillText('$' + points[points.length - 1].toFixed(2), pad.l - 4, ys(points[points.length - 1]) + 4);
@@ -252,10 +299,52 @@ function renderWeights(weights) {
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `
       <div class="weight-row">
-        <span class="weight-label">${k.replace('_', ' ')}</span>
+        <span class="weight-label">${k.replace(/_/g, ' ')}</span>
         <div class="weight-bar-wrap"><div class="weight-bar" style="width:${(v/max*100).toFixed(1)}%"></div></div>
         <span class="weight-val">${(v*100).toFixed(1)}%</span>
       </div>`).join('');
+}
+
+function render30Signals(data) {
+  const wrap = document.getElementById('signals30-chart');
+  if (!data || !Object.keys(data).length) {
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:12px">Waiting for first scan cycle…</div>';
+    return;
+  }
+
+  let leftHTML = '', rightHTML = '';
+  const groups = Object.entries(SIG_GROUPS);
+  groups.forEach(([groupName, keys], gi) => {
+    const rows = keys.map(k => {
+      const v = data[k] !== undefined ? data[k] : 0;
+      const pct = Math.min(Math.abs(v) * 50, 50); // max 50% each side
+      const posW = v > 0 ? pct : 0;
+      const negW = v < 0 ? pct : 0;
+      const valColor = v > 0.3 ? 'var(--green)' : v < -0.3 ? 'var(--red)' : 'var(--muted)';
+      return `
+        <div class="sig30-row">
+          <span class="sig30-name" title="${k}">${k.replace(/_/g,' ')}</span>
+          <div class="sig30-bar-wrap">
+            <div class="sig30-bar-neg" style="width:${negW}%"></div>
+            <div class="sig30-bar-pos" style="width:${posW}%"></div>
+          </div>
+          <span class="sig30-val" style="color:${valColor}">${v.toFixed(3)}</span>
+        </div>`;
+    }).join('');
+
+    const groupHTML = `
+      <div class="sig30-group">
+        <div class="sig30-group-title">${groupName}</div>
+        ${rows}
+      </div>`;
+
+    if (gi < Math.ceil(groups.length / 2)) leftHTML += groupHTML;
+    else rightHTML += groupHTML;
+  });
+
+  wrap.innerHTML = `
+    <div>${leftHTML}</div>
+    <div>${rightHTML}</div>`;
 }
 
 function renderTrades(trades) {
@@ -299,6 +388,26 @@ function renderPairs(pairs) {
     </tr>`).join('');
 }
 
+// ── uptime clock (runs every second, no server hit) ─────────────────────────
+let _serverUptimeSecs = 0;
+let _localOffset = 0;
+async function fetchUptime() {
+  try {
+    const res = await fetch('/api/uptime');
+    const d = await res.json();
+    _serverUptimeSecs = d.seconds;
+    _localOffset = Date.now();
+  } catch(e) {}
+}
+function tickUptime() {
+  const elapsed = Math.floor((Date.now() - _localOffset) / 1000);
+  const total = _serverUptimeSecs + elapsed;
+  const h = String(Math.floor(total / 3600)).padStart(2,'0');
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2,'0');
+  const s = String(total % 60).padStart(2,'0');
+  document.getElementById('uptime-display').textContent = `${h}:${m}:${s}`;
+}
+
 // ── main poll loop ──────────────────────────────────────────────────────────
 async function update() {
   try {
@@ -306,11 +415,9 @@ async function update() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
 
-    // Header
     document.getElementById('status-dot').className = 'live';
     document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
-    // KPIs
     const bal = d.capital.balance;
     document.getElementById('balance').textContent = '$' + bal.toFixed(2);
     const dp = d.capital.daily_pnl;
@@ -329,7 +436,6 @@ async function update() {
     document.getElementById('total-pnl').innerHTML =
       `Total P&L (20): <span class="${colorClass(tp)}">${tp >= 0 ? '+' : ''}$${tp.toFixed(4)}</span>`;
 
-    // Regime
     const reg = d.regime.regime;
     document.getElementById('regime-badge-wrap').innerHTML =
       `<span class="regime-badge regime-${reg}">${reg}</span>`;
@@ -339,15 +445,12 @@ async function update() {
     bar.style.width = (conf * 100) + '%';
     bar.style.background = conf > 0.7 ? 'var(--green)' : conf > 0.4 ? 'var(--yellow)' : 'var(--red)';
 
-    // Capital chart
     const canvas = document.getElementById('cap-chart');
     const pts = d.capital.history.map(h => h.balance);
     if (pts.length > 1) drawChart(canvas, pts);
 
-    // Signal weights
     if (Object.keys(d.weights).length) renderWeights(d.weights);
 
-    // Tables
     renderTrades(d.trades);
     renderOpps(d.opportunities);
     renderPairs(d.pairs);
@@ -358,15 +461,19 @@ async function update() {
   }
 }
 
-// ── signals + log polling (every 10s) ──────────────────────────────────────
-async function updateSignalsAndLog() {
+// ── signals30 + log + confidence (every 10s) ───────────────────────────────
+async function updateAll() {
   try {
-    const [sigRes, logRes] = await Promise.all([
+    const [sigRes, logRes, confRes, sig30Res] = await Promise.all([
       fetch('/api/signals'),
       fetch('/api/logs'),
+      fetch('/api/confidence'),
+      fetch('/api/signals30'),
     ]);
-    const sig = await sigRes.json();
-    const log = await logRes.json();
+    const sig   = await sigRes.json();
+    const log   = await logRes.json();
+    const confD = await confRes.json();
+    const sig30 = await sig30Res.json();
 
     // Signal snapshot
     const snap = document.getElementById('signal-snapshot');
@@ -391,11 +498,32 @@ async function updateSignalsAndLog() {
         <div class="weight-row"><span class="weight-label">Updated</span><span style="color:var(--muted)">${sig.ts.slice(11,19)}</span></div>`;
     }
 
+    // 30 signals chart
+    render30Signals(sig30);
+
     // Bot log
-    document.getElementById('bot-log').textContent = log.lines.join('\n');
-    // Auto-scroll to bottom
     const pre = document.getElementById('bot-log');
+    pre.textContent = log.lines.join('\n');
     pre.scrollTop = pre.scrollHeight;
+
+    // Confidence chart
+    const history = confD.history || [];
+    if (history.length) {
+      drawConfChart(document.getElementById('conf-chart'), history);
+      const confs = history.map(h => h.confidence);
+      const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
+      const trend = confs.length > 5
+        ? confs.slice(-5).reduce((a,b)=>a+b,0)/5 - confs.slice(0,5).reduce((a,b)=>a+b,0)/5
+        : 0;
+      const trendStr = trend > 0.01 ? '↑ improving' : trend < -0.01 ? '↓ declining' : '→ stable';
+      const trendColor = trend > 0.01 ? 'var(--green)' : trend < -0.01 ? 'var(--red)' : 'var(--muted)';
+      const latest = confs[confs.length - 1];
+      document.getElementById('conf-stats').innerHTML =
+        `Avg: <strong>${(avg*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
+        `Latest: <strong>${(latest*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
+        `Trend: <span style="color:${trendColor}">${trendStr}</span> &nbsp;|&nbsp; ` +
+        `<span style="color:var(--yellow)">— = 40% threshold</span>`;
+    }
 
   } catch (e) {}
 }
@@ -410,27 +538,23 @@ function drawConfChart(canvas, data) {
   ctx.scale(dpr, dpr);
 
   const points = data.map(d => d.confidence);
-  const min = 0, max = 1;
   const pad = { t: 8, b: 18, l: 36, r: 8 };
   const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
 
   ctx.clearRect(0, 0, W, H);
 
-  // Threshold line at 0.4
-  const y04 = pad.t + ch - (0.4 / 1) * ch;
+  const y04 = pad.t + ch - 0.4 * ch;
   ctx.setLineDash([4, 4]);
-  ctx.strokeStyle = '#eab308';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#eab308'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.l, y04); ctx.lineTo(pad.l + cw, y04); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Gradient fill
   const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
   grad.addColorStop(0, 'rgba(168,85,247,.35)');
   grad.addColorStop(1, 'rgba(168,85,247,0)');
 
   const xs = i => pad.l + (i / (points.length - 1 || 1)) * cw;
-  const ys = v => pad.t + ch - (v / 1) * ch;
+  const ys = v => pad.t + ch - v * ch;
 
   ctx.beginPath();
   ctx.moveTo(xs(0), ys(points[0]));
@@ -440,56 +564,36 @@ function drawConfChart(canvas, data) {
   ctx.closePath();
   ctx.fillStyle = grad; ctx.fill();
 
-  // Line
   ctx.beginPath();
   ctx.moveTo(xs(0), ys(points[0]));
   for (let i = 1; i < points.length; i++) ctx.lineTo(xs(i), ys(points[i]));
   ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2; ctx.stroke();
 
-  // Y labels
   ctx.fillStyle = '#64748b'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
   ctx.fillText('100%', pad.l - 3, pad.t + 8);
   ctx.fillText('40%',  pad.l - 3, y04 + 4);
   ctx.fillText('0%',   pad.l - 3, pad.t + ch);
 }
 
-async function updateConfidence() {
-  try {
-    const res = await fetch('/api/confidence');
-    const d = await res.json();
-    const history = d.history || [];
-    if (!history.length) return;
-
-    drawConfChart(document.getElementById('conf-chart'), history);
-
-    const confs = history.map(h => h.confidence);
-    const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
-    const trend = confs.length > 5
-      ? confs.slice(-5).reduce((a,b)=>a+b,0)/5 - confs.slice(0,5).reduce((a,b)=>a+b,0)/5
-      : 0;
-    const trendStr = trend > 0.01 ? '↑ improving' : trend < -0.01 ? '↓ declining' : '→ stable';
-    const trendColor = trend > 0.01 ? 'var(--green)' : trend < -0.01 ? 'var(--red)' : 'var(--muted)';
-    const latest = confs[confs.length - 1];
-    document.getElementById('conf-stats').innerHTML =
-      `Avg: <strong>${(avg*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
-      `Latest: <strong>${(latest*100).toFixed(1)}%</strong> &nbsp;|&nbsp; ` +
-      `Trend: <span style="color:${trendColor}">${trendStr}</span> &nbsp;|&nbsp; ` +
-      `<span style="color:var(--yellow)">— = 40% threshold</span>`;
-  } catch(e) {}
-}
+// ── boot ────────────────────────────────────────────────────────────────────
+fetchUptime();
+setInterval(fetchUptime, 60000);   // re-sync server uptime every minute
+setInterval(tickUptime, 1000);     // tick locally every second
 
 update();
 setInterval(update, 5000);
-updateSignalsAndLog();
-setInterval(updateSignalsAndLog, 10000);
-updateConfidence();
-setInterval(updateConfidence, 15000);
-window.addEventListener('resize', updateConfidence);
+
+updateAll();
+setInterval(updateAll, 10000);
+
 window.addEventListener('resize', () => {
-  fetch('/api/status').then(r => r.json()).then(d => {
-    const pts = d.capital.history.map(h => h.balance);
+  fetch('/api/status').then(r=>r.json()).then(d=>{
+    const pts = d.capital.history.map(h=>h.balance);
     if (pts.length > 1) drawChart(document.getElementById('cap-chart'), pts);
-  }).catch(() => {});
+  }).catch(()=>{});
+  fetch('/api/confidence').then(r=>r.json()).then(d=>{
+    if (d.history && d.history.length) drawConfChart(document.getElementById('conf-chart'), d.history);
+  }).catch(()=>{});
 });
 </script>
 </body>

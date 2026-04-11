@@ -248,6 +248,14 @@ class MasterEngine:
             d_scores = self._derived_sig.calculate(c_scores, t_scores)
             self._current_signals_30 = {**c_scores, **ob_scores,
                                         **t_scores, **f_scores, **d_scores}
+            # Write to file so dashboard can read live signal values
+            try:
+                import json as _json
+                _sig_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "live_signals_30.json")
+                with open(_sig_path, "w") as _f:
+                    _json.dump(self._current_signals_30, _f)
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(f"30-signal compute error: {e}")
 

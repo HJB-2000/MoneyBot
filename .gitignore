@@ -18,6 +18,8 @@ data/*.json
 !data/base_rates.json
 !data/signal_correlations.json
 !data/signal_weights.json
+# live_signals_30.json is runtime ephemeral, never commit
+data/live_signals_30.json
 
 # Logs — local only
 logs/
