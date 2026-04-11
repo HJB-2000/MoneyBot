@@ -50,6 +50,29 @@ class Notifier:
                 "GMAIL_PASSWORD, GMAIL_RECEIVER to enable."
             )
 
+    def _send_msg(self, msg) -> bool:
+        """Try port 465 (SSL) first, fall back to port 587 (STARTTLS)."""
+        # Try SSL on port 465
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as smtp:
+                smtp.login(self._sender, self._password)
+                smtp.sendmail(self._sender, self._receiver, msg.as_string())
+            return True
+        except Exception as e465:
+            print(f"[notify] Port 465 failed ({e465}), trying 587...")
+        # Fallback: STARTTLS on port 587
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.ehlo()
+                smtp.login(self._sender, self._password)
+                smtp.sendmail(self._sender, self._receiver, msg.as_string())
+            return True
+        except Exception as e587:
+            print(f"[notify] Port 587 also failed ({e587})")
+            return False
+
     def send(self, subject: str, body: str) -> bool:
         if not self.enabled:
             print(f"[notify] {subject}\n{body}")
@@ -59,11 +82,10 @@ class Notifier:
             msg["Subject"] = subject
             msg["From"]    = self._sender
             msg["To"]      = self._receiver
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-                smtp.login(self._sender, self._password)
-                smtp.sendmail(self._sender, self._receiver, msg.as_string())
-            print(f"✅ Email sent: {subject}")
-            return True
+            ok = self._send_msg(msg)
+            if ok:
+                print(f"✅ Email sent: {subject}")
+            return ok
         except Exception as e:
             print(f"[notify] Failed to send email: {e}")
             return False
@@ -83,11 +105,10 @@ class Notifier:
             part = MIMEApplication(file_bytes, Name=filename)
             part["Content-Disposition"] = f'attachment; filename="{filename}"'
             msg.attach(part)
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-                smtp.login(self._sender, self._password)
-                smtp.sendmail(self._sender, self._receiver, msg.as_string())
-            print(f"✅ Email with attachment sent: {subject}")
-            return True
+            ok = self._send_msg(msg)
+            if ok:
+                print(f"✅ Email with attachment sent: {subject}")
+            return ok
         except Exception as e:
             print(f"[notify] Failed to send email with attachment: {e}")
             return False

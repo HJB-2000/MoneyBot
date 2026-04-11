@@ -4,7 +4,7 @@ import queue
 import threading
 import time
 import yaml
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, TimeoutError
 from datetime import datetime, timezone
 
 from brain.market_reader import MarketReader
@@ -436,13 +436,18 @@ class MasterEngine:
                 )
                 futures[f] = strat_name
 
-            for future in as_completed(futures, timeout=15):
+            done, pending = wait(list(futures.keys()), timeout=25)
+            for future in done:
+                strat_name = futures[future]
                 try:
                     opps = future.result()
                     if opps:
                         all_opportunities.extend(opps)
                 except Exception as e:
-                    logger.warning(f"Strategy scan error: {e}")
+                    logger.warning(f"Strategy scan error ({strat_name}): {e}")
+            if pending:
+                slow = [futures[f] for f in pending]
+                logger.warning(f"Scan timeout: {slow} did not finish in 25s — skipped")
 
         # Put each opportunity on the queue
         count = 0
