@@ -135,6 +135,37 @@ class Notifier:
             print(f"[notify] Log rotation failed: {e}")
             return False
 
+    def bot_started(self, capital: float, pairs: int) -> bool:
+        ts = datetime.now(timezone.utc).isoformat()
+        body = (
+            f"MoneyBot has started successfully.\n\n"
+            f"Timestamp  : {ts}\n"
+            f"Capital    : ${capital:.2f}\n"
+            f"Pairs      : {pairs} in scan universe\n"
+            f"Mode       : Paper Trading\n\n"
+            f"Email notifications are working.\n"
+            f"You will receive a heartbeat every 10 hours and the log file when it reaches 3MB."
+        )
+        return self.send("✅ MoneyBot Started — Email Confirmed", body)
+
+    def heartbeat(self, capital: float, trades: int, wins: int,
+                  losses: int, uptime_hours: float) -> bool:
+        ts = datetime.now(timezone.utc).isoformat()
+        win_rate = f"{wins/(wins+losses)*100:.1f}%" if (wins + losses) > 0 else "N/A"
+        body = (
+            f"MoneyBot is running normally.\n\n"
+            f"Timestamp   : {ts}\n"
+            f"Uptime      : {uptime_hours:.1f} hours\n\n"
+            f"── Performance ──\n"
+            f"Capital     : ${capital:.2f}\n"
+            f"Trades      : {trades}\n"
+            f"Wins        : {wins}\n"
+            f"Losses      : {losses}\n"
+            f"Win Rate    : {win_rate}\n\n"
+            f"Next heartbeat in 10 hours."
+        )
+        return self.send("💓 MoneyBot Heartbeat — Still Running", body)
+
     def training_started(self, steps: list) -> bool:
         ts  = datetime.now(timezone.utc).isoformat()
         machine = platform.node()
