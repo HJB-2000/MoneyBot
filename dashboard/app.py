@@ -240,6 +240,40 @@ def create_app() -> Flask:
                 pass
         return jsonify({})
 
+    @app.route("/api/openpositions")
+    def openpositions():
+        import json as _json
+        f = ROOT / "data" / "open_orders.json"
+        if not f.exists() or f.stat().st_size == 0:
+            return jsonify([])
+        try:
+            positions = _json.loads(f.read_text())
+            out = []
+            for pid, p in positions.items():
+                opened = p.get("opened_at", "")
+                age_s = 0
+                try:
+                    from datetime import datetime, timezone
+                    dt = datetime.fromisoformat(opened)
+                    age_s = int((datetime.now(timezone.utc) - dt).total_seconds())
+                except Exception:
+                    pass
+                out.append({
+                    "id":       pid,
+                    "strategy": p.get("strategy", ""),
+                    "pair":     p.get("pair", ""),
+                    "direction":p.get("direction", ""),
+                    "entry":    _safe_float(p.get("entry_price")),
+                    "size":     _safe_float(p.get("size_usd")),
+                    "target":   _safe_float(p.get("target_price")),
+                    "stop":     _safe_float(p.get("stop_price")),
+                    "age_s":    age_s,
+                    "regime":   p.get("regime", ""),
+                })
+            return jsonify(out)
+        except Exception:
+            return jsonify([])
+
     @app.route("/api/logs")
     def logs():
         return jsonify({"lines": _bot_log_tail(80)})

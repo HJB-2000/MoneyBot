@@ -80,9 +80,10 @@ class SmartExecutor:
         fill = self._sim.simulate(opp)
         net_pnl = fill["net_pnl_usd"]
 
-        # Record open position
+        # Record open position + deduct capital
         self._orders.open(opp)
         self._risk.record_open(opp)
+        self._tracker.log_open(opp)   # deducts size, logs RUNNING
 
         # For instant strategies (triangular arb, volume spike with short expiry),
         # close immediately and settle P&L.

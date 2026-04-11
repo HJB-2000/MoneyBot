@@ -185,6 +185,14 @@ class MasterEngine:
                     self.market_reader.get_candles(sym, "5m", limit=100)
             except Exception as e:
                 logger.warning(f"DataThread error: {e}")
+            # Build stat_arb correlation matrix here (hourly) — keeps it off
+            # the ScanThread so it never blocks opportunity processing
+            try:
+                self.strategies["stat_arb"].rebuild_if_needed(
+                    self.config, self.market_reader
+                )
+            except Exception as e:
+                logger.warning(f"stat_arb matrix build error: {e}")
             time.sleep(5)
 
     # ------------------------------------------------------------------ #

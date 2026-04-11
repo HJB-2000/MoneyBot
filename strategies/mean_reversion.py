@@ -89,7 +89,7 @@ class MeanReversionStrategy(BaseStrategy):
                     exchange_latency_ms=market_reader.avg_latency_ms,
                     detected_at=datetime.now(timezone.utc),
                     regime=regime,
-                    expiry_seconds=30,
+                    expiry_seconds=120,
                     target_price=entry_price * (1 + target_pct),
                     stop_price=entry_price * (1 - stop_pct),
                     hold_max_seconds=int(cfg["max_hold_minutes"] * 60),

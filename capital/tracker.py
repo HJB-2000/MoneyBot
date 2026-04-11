@@ -98,18 +98,55 @@ class CapitalTracker:
         with self._lock:
             return self._capital
 
-    def update(self, pnl_usd: float, trade_meta: dict = None):
-        """Apply a P&L update. trade_meta is logged to trade_log.csv if provided."""
+    def log_open(self, opp) -> None:
+        """
+        Called when a trade is opened.
+        Deducts trade size from capital and logs a RUNNING entry to trade_log.
+        """
         with self._lock:
             self._roll_daily_if_needed()
-            self._capital += pnl_usd
+            self._capital -= opp.trade_size_usd
+            self._capital = max(self._capital, self._survival_floor)
+            self._save_balance(self._capital)
+            meta = {
+                "timestamp":   datetime.now(timezone.utc).isoformat(),
+                "strategy":    opp.strategy,
+                "pair":        opp.pair,
+                "direction":   opp.direction,
+                "entry_price": opp.entry_price,
+                "exit_price":  "",
+                "size_usd":    opp.trade_size_usd,
+                "gross_profit_pct": "",
+                "fees_pct":    opp.fees_pct,
+                "slippage_pct": opp.slippage_pct,
+                "net_profit_pct": "",
+                "regime":      opp.regime,
+                "confidence":  opp.confidence,
+                "score":       opp.score,
+                "hold_seconds": "",
+                "result":      "RUNNING",
+                "trade_id":    opp.id,
+            }
+            self._log_trade(-opp.trade_size_usd, meta)
+            print(f"  OPEN  {opp.strategy} {opp.pair} ${opp.trade_size_usd:.2f} → capital ${self._capital:.2f}")
+
+    def update(self, pnl_usd: float, trade_meta: dict = None):
+        """
+        Called when a trade closes.
+        pnl_usd = net P&L only (NOT including returned size).
+        Adds back trade size + pnl and logs WIN/LOSS.
+        """
+        with self._lock:
+            self._roll_daily_if_needed()
+            size = float(trade_meta.get("size_usd", 0)) if trade_meta else 0.0
+            self._capital += size + pnl_usd   # return the locked capital + pnl
             self._capital = max(self._capital, self._survival_floor)
             if self._capital > self._peak_capital:
                 self._peak_capital = self._capital
             self._save_balance(self._capital)
             self._log_trade(pnl_usd, trade_meta)
             self._milestone_check()
-            print(f"  Capital: ${self._capital:.2f} ({'+'if pnl_usd>=0 else ''}{pnl_usd:.4f})")
+            print(f"  CLOSE capital: ${self._capital:.2f} ({'+'if pnl_usd>=0 else ''}{pnl_usd:.4f})")
 
     def _roll_daily_if_needed(self):
         today = date.today()
@@ -153,7 +190,9 @@ class CapitalTracker:
         with open(TRADE_LOG, "r") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                rows.append(row.get("result", ""))
+                r = row.get("result", "")
+                if r in ("WIN", "LOSS"):   # skip RUNNING entries
+                    rows.append(r)
         return rows[-n:]
 
     def _milestone_check(self):

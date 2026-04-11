@@ -23,6 +23,11 @@ class StatArbStrategy(BaseStrategy):
     def name(self) -> str:
         return "stat_arb"
 
+    def rebuild_if_needed(self, config: dict, market_reader):
+        """Called from DataThread so matrix builds happen off the scan hot path."""
+        if self._should_rebuild():
+            self._build_matrix(config, market_reader)
+
     def scan(self, regime: str, size_mult: float, signals: dict,
              signal_objects, market_reader, capital: float, config: dict) -> List[Opportunity]:
         if not config["strategies"]["stat_arb"]["enabled"]:
@@ -30,15 +35,12 @@ class StatArbStrategy(BaseStrategy):
         if regime == "VOLATILE":
             return []
 
-        cfg = config["strategies"]["stat_arb"]
-        bias = getattr(signal_objects.get("_route_result"), "bias", None)
-
-        # Rebuild correlation matrix every hour
-        if self._should_rebuild():
-            self._build_matrix(config, market_reader)
-
+        # Matrix built by DataThread — skip quietly until ready
         if not self._corr_pairs:
             return []
+
+        cfg = config["strategies"]["stat_arb"]
+        bias = getattr(signal_objects.get("_route_result"), "bias", None)
 
         trade_size = capital * config["capital"]["max_position_pct"] * size_mult
         trade_size = max(trade_size, 5.0)

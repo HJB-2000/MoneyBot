@@ -261,6 +261,17 @@
   </div>
 </div>
 
+<!-- Open Positions (running trades) -->
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <div class="card-title">Open Positions <span id="open-pos-count" style="color:var(--muted);font-size:10px"></span></div>
+    <table>
+      <thead><tr><th>Strategy</th><th>Pair</th><th>Dir</th><th>Entry</th><th>Target</th><th>Stop</th><th>Size</th><th>Age</th></tr></thead>
+      <tbody id="open-pos-body"><tr><td colspan="8" style="color:var(--muted);text-align:center">No open positions</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- Trades + Opportunities -->
 <div class="grid grid-2">
   <div class="card">
@@ -411,10 +422,46 @@ function render30Signals(data) {
     <div>${rightHTML}</div>`;
 }
 
+function fmtAge(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+function renderOpenPositions(positions) {
+  const tbody = document.getElementById('open-pos-body');
+  const count = document.getElementById('open-pos-count');
+  if (!positions.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center">No open positions</td></tr>';
+    count.textContent = '';
+    return;
+  }
+  count.textContent = `(${positions.length} running)`;
+  tbody.innerHTML = positions.map(p => `
+    <tr style="background:rgba(59,130,246,.04)">
+      <td style="color:var(--blue);font-weight:600">${p.strategy.replace(/_/g,' ')}</td>
+      <td><strong>${p.pair}</strong></td>
+      <td><span style="color:${p.direction==='long'?'var(--green)':'var(--red)'}">${p.direction.toUpperCase()}</span></td>
+      <td>${p.entry.toFixed(p.entry>100?2:4)}</td>
+      <td class="pos">${p.target.toFixed(p.target>100?2:4)}</td>
+      <td class="neg">${p.stop.toFixed(p.stop>100?2:4)}</td>
+      <td>$${p.size.toFixed(2)}</td>
+      <td style="color:var(--muted)">${fmtAge(p.age_s)}</td>
+    </tr>`).join('');
+}
+
+async function updateOpenPositions() {
+  try {
+    const res = await fetch('/api/openpositions');
+    renderOpenPositions(await res.json());
+  } catch(e) {}
+}
+
 function renderTrades(trades) {
   const tbody = document.getElementById('trades-body');
-  if (!trades.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center">No trades yet</td></tr>'; return; }
-  tbody.innerHTML = trades.map(t => `
+  const closed = trades.filter(t => t.result === 'WIN' || t.result === 'LOSS');
+  if (!closed.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center">No closed trades yet</td></tr>'; return; }
+  tbody.innerHTML = closed.map(t => `
     <tr>
       <td style="color:var(--muted)">${t.ts.slice(11)}</td>
       <td>${t.pair}</td>
@@ -784,6 +831,9 @@ setInterval(updateVolume, 15000);
 
 checkLogSize();
 setInterval(checkLogSize, 30000);  // check log size every 30s
+
+updateOpenPositions();
+setInterval(updateOpenPositions, 5000);  // refresh open positions every 5s
 
 window.addEventListener('resize', () => {
   fetch('/api/status').then(r=>r.json()).then(d=>{
