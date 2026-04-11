@@ -40,9 +40,17 @@ from strategies.mean_reversion import MeanReversionStrategy
 from strategies.volume_spike import VolumeSpikeStrategy
 from strategies.correlation_breakout import CorrelationBreakoutStrategy
 
+_log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+os.makedirs(_log_dir, exist_ok=True)
+_log_file = os.path.join(_log_dir, "bot.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(threadName)s] %(levelname)s %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(_log_file, encoding="utf-8"),
+    ],
 )
 logger = logging.getLogger("MasterEngine")
 
