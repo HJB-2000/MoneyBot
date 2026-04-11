@@ -16,15 +16,18 @@ class MarketReader:
         cfg = config["exchange"]
         self._exchange = ccxt.binance({
             "enableRateLimit": True,
+            "timeout": 8000,          # 8s socket timeout — fail fast, don't hang
             "options": {"defaultType": "spot"},
         })
         self._futures = ccxt.binance({
             "enableRateLimit": True,
+            "timeout": 8000,
             "options": {"defaultType": "future"},
         })
         # Bybit linear perpetuals — no geo-restriction, public endpoints
         self._bybit = ccxt.bybit({
             "enableRateLimit": True,
+            "timeout": 8000,
             "options": {"defaultType": "linear"},
         })
         self._cache: dict = {}

@@ -205,13 +205,34 @@ class MasterEngine:
         mr = self.market_reader
         # Use SOL/USDT as the "market representative" for signals
         sym = "SOL/USDT"
-        candles = mr.get_candles(sym)
-        ob = mr.get_orderbook(sym)
-        trades = mr.get_trades(sym)
-        funding = mr.get_funding_rate(sym)
-        oi = mr.get_open_interest(sym)
-        oi_1h_ago = mr.get_oi_1h_ago(sym)
-        liquidations = mr.get_liquidations(sym)
+        logger.debug("BrainThread cycle starting")
+
+        # Fetch all market data in parallel — prevents a single slow/hung
+        # Bybit or Binance-futures call from freezing the whole brain thread
+        with ThreadPoolExecutor(max_workers=7) as _dp:
+            _f_candles     = _dp.submit(mr.get_candles, sym)
+            _f_ob          = _dp.submit(mr.get_orderbook, sym)
+            _f_trades      = _dp.submit(mr.get_trades, sym)
+            _f_funding     = _dp.submit(mr.get_funding_rate, sym)
+            _f_oi          = _dp.submit(mr.get_open_interest, sym)
+            _f_oi1h        = _dp.submit(mr.get_oi_1h_ago, sym)
+            _f_liq         = _dp.submit(mr.get_liquidations, sym)
+            _all = [_f_candles, _f_ob, _f_trades, _f_funding, _f_oi, _f_oi1h, _f_liq]
+            wait(_all, timeout=12)   # hard ceiling; each ccxt call has 8s socket timeout
+
+        def _get(f, default=None):
+            try:
+                return f.result() if f.done() else default
+            except Exception:
+                return default
+
+        candles     = _get(_f_candles)
+        ob          = _get(_f_ob)
+        trades      = _get(_f_trades)
+        funding     = _get(_f_funding)
+        oi          = _get(_f_oi)
+        oi_1h_ago   = _get(_f_oi1h)
+        liquidations = _get(_f_liq, [])
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {
