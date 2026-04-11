@@ -366,6 +366,13 @@ function drawChart(canvas, points) {
 function fmt(v) { return v >= 0 ? '+' + v.toFixed(4) : v.toFixed(4); }
 function fmtPct(v) { return (v * 100).toFixed(2) + '%'; }
 function colorClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neutral'; }
+function fmtPrice(v) {
+  if (!v || v === 0) return '0';
+  if (v >= 1000) return v.toFixed(2);
+  if (v >= 1)    return v.toFixed(4);
+  if (v >= 0.01) return v.toFixed(6);
+  return v.toPrecision(4);
+}
 
 function renderWeights(weights) {
   const max = Math.max(...Object.values(weights), 0.01);
@@ -442,9 +449,9 @@ function renderOpenPositions(positions) {
       <td style="color:var(--blue);font-weight:600">${p.strategy.replace(/_/g,' ')}</td>
       <td><strong>${p.pair}</strong></td>
       <td><span style="color:${p.direction==='long'?'var(--green)':'var(--red)'}">${p.direction.toUpperCase()}</span></td>
-      <td>${p.entry.toFixed(p.entry>100?2:4)}</td>
-      <td class="pos">${p.target.toFixed(p.target>100?2:4)}</td>
-      <td class="neg">${p.stop.toFixed(p.stop>100?2:4)}</td>
+      <td>${fmtPrice(p.entry)}</td>
+      <td class="pos">${fmtPrice(p.target)}</td>
+      <td class="neg">${fmtPrice(p.stop)}</td>
       <td>$${p.size.toFixed(2)}</td>
       <td style="color:var(--muted)">${fmtAge(p.age_s)}</td>
     </tr>`).join('');

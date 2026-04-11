@@ -21,6 +21,7 @@ class CapitalTracker:
         self._peak_capital = self._capital
         self._daily_start = self._capital
         self._daily_start_date = date.today()
+        self._reserved = 0.0
         self._milestones_crossed = set(self._load_milestones())
         self._ensure_trade_log()
 
@@ -101,45 +102,24 @@ class CapitalTracker:
     def log_open(self, opp) -> None:
         """
         Called when a trade is opened.
-        Deducts trade size from capital and logs a RUNNING entry to trade_log.
+        Tracks reserved capital without changing the balance (so daily P&L
+        is not polluted — only realised P&L from closed trades counts).
         """
         with self._lock:
-            self._roll_daily_if_needed()
-            self._capital -= opp.trade_size_usd
-            self._capital = max(self._capital, self._survival_floor)
-            self._save_balance(self._capital)
-            meta = {
-                "timestamp":   datetime.now(timezone.utc).isoformat(),
-                "strategy":    opp.strategy,
-                "pair":        opp.pair,
-                "direction":   opp.direction,
-                "entry_price": opp.entry_price,
-                "exit_price":  "",
-                "size_usd":    opp.trade_size_usd,
-                "gross_profit_pct": "",
-                "fees_pct":    opp.fees_pct,
-                "slippage_pct": opp.slippage_pct,
-                "net_profit_pct": "",
-                "regime":      opp.regime,
-                "confidence":  opp.confidence,
-                "score":       opp.score,
-                "hold_seconds": "",
-                "result":      "RUNNING",
-                "trade_id":    opp.id,
-            }
-            self._log_trade(-opp.trade_size_usd, meta)
-            print(f"  OPEN  {opp.strategy} {opp.pair} ${opp.trade_size_usd:.2f} → capital ${self._capital:.2f}")
+            self._reserved += opp.trade_size_usd
+            print(f"  OPEN  {opp.strategy} {opp.pair} ${opp.trade_size_usd:.2f} "
+                  f"| capital ${self._capital:.2f} (reserved ${self._reserved:.2f})")
 
     def update(self, pnl_usd: float, trade_meta: dict = None):
         """
         Called when a trade closes.
-        pnl_usd = net P&L only (NOT including returned size).
-        Adds back trade size + pnl and logs WIN/LOSS.
+        Applies net P&L to capital and releases the reserved size.
         """
         with self._lock:
             self._roll_daily_if_needed()
             size = float(trade_meta.get("size_usd", 0)) if trade_meta else 0.0
-            self._capital += size + pnl_usd   # return the locked capital + pnl
+            self._reserved = max(0.0, self._reserved - size)
+            self._capital += pnl_usd          # only realised P&L moves capital
             self._capital = max(self._capital, self._survival_floor)
             if self._capital > self._peak_capital:
                 self._peak_capital = self._capital
