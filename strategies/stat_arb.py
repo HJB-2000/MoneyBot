@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from typing import List
 
@@ -62,15 +63,25 @@ class StatArbStrategy(BaseStrategy):
         return (datetime.now(timezone.utc) - self._last_matrix_build) > timedelta(hours=1)
 
     def _build_matrix(self, config: dict, market_reader):
-        """Fetch 48h of 5m candles and compute Pearson correlations."""
+        """Fetch candles in parallel and compute Pearson correlations."""
         pairs = config["pairs"]["scan_universe"]
         threshold = config["strategies"]["stat_arb"]["correlation_threshold"]
         price_data = {}
 
-        for sym in pairs:
-            candles = market_reader.get_candles(sym, "5m", limit=100)
-            if candles is not None and len(candles) >= 30:
-                price_data[sym] = candles["close"].values.astype(float)
+        # Fetch all pairs in parallel — was sequential (30+ seconds for 32 pairs)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(market_reader.get_candles, sym, "5m", 100): sym
+                       for sym in pairs}
+            wait(list(futures.keys()), timeout=15)
+        for f, sym in futures.items():
+            if not f.done():
+                continue
+            try:
+                candles = f.result()
+                if candles is not None and len(candles) >= 30:
+                    price_data[sym] = candles["close"].values.astype(float)
+            except Exception:
+                pass
 
         corr_pairs = {}
         syms = list(price_data.keys())
