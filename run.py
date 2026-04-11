@@ -17,13 +17,15 @@ from brain.master_engine import MasterEngine
 def start_dashboard():
     from dashboard.app import create_app
     app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)
     dashboard_thread.start()
-    print("[MoneyBot] Dashboard running at http://localhost:5000")
+    print(f"[MoneyBot] Dashboard running at http://0.0.0.0:{port}")
 
     engine = MasterEngine("config/config.yaml")
     engine.start()

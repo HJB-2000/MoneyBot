@@ -9,9 +9,15 @@ env/
 # Local data — stays private, too large for GitHub
 data/historical/
 data/*.csv
-data/*.json
 data/*.db
 moneyBot.db
+
+# Ignore all JSON in data/ except trained model outputs
+data/*.json
+!data/likelihood_ratios.json
+!data/base_rates.json
+!data/signal_correlations.json
+!data/signal_weights.json
 
 # Logs — local only
 logs/

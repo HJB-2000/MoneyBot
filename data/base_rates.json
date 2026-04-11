@@ -1,0 +1,11 @@
+{
+  "RANGING": 0.55,
+  "TRENDING_UP": 0.52,
+  "TRENDING_DOWN": 0.5,
+  "BREAKOUT": 0.48,
+  "FUNDING_RICH": 0.57,
+  "WHALE_MOVING": 0.45,
+  "CHOPPY": 0.43,
+  "VOLATILE": 0.3,
+  "UNKNOWN": 0.5
+}

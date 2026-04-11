@@ -1,0 +1,10 @@
+{
+  "price_action": 0.15,
+  "momentum": 0.15,
+  "microstructure": 0.20,
+  "volatility": 0.15,
+  "sentiment": 0.10,
+  "cvd": 0.15,
+  "vwap": 0.05,
+  "whale": 0.05
+}

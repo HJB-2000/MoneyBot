@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "python3 -u run.py"
+healthcheckPath = "/api/status"
+healthcheckTimeout = 30
+restartPolicyType = "always"
