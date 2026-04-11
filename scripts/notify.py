@@ -31,6 +31,8 @@ import smtplib
 import traceback
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 
 
 class Notifier:
@@ -64,6 +66,73 @@ class Notifier:
             return True
         except Exception as e:
             print(f"[notify] Failed to send email: {e}")
+            return False
+
+    def send_with_attachment(self, subject: str, body: str,
+                             filename: str, file_bytes: bytes) -> bool:
+        """Send an email with a file attachment."""
+        if not self.enabled:
+            print(f"[notify] {subject} (attachment: {filename})")
+            return False
+        try:
+            msg = MIMEMultipart()
+            msg["Subject"] = subject
+            msg["From"]    = self._sender
+            msg["To"]      = self._receiver
+            msg.attach(MIMEText(body))
+            part = MIMEApplication(file_bytes, Name=filename)
+            part["Content-Disposition"] = f'attachment; filename="{filename}"'
+            msg.attach(part)
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+                smtp.login(self._sender, self._password)
+                smtp.sendmail(self._sender, self._receiver, msg.as_string())
+            print(f"✅ Email with attachment sent: {subject}")
+            return True
+        except Exception as e:
+            print(f"[notify] Failed to send email with attachment: {e}")
+            return False
+
+    def rotate_log(self, log_path: str, max_bytes: int = 3 * 1024 * 1024) -> bool:
+        """
+        Check if log_path exceeds max_bytes (default 3MB).
+        If so: email it as attachment, then truncate the file.
+        Returns True if rotation happened.
+        """
+        try:
+            if not os.path.exists(log_path):
+                return False
+            size = os.path.getsize(log_path)
+            if size < max_bytes:
+                return False
+
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            filename = f"bot_{ts}.log"
+
+            with open(log_path, "rb") as f:
+                log_bytes = f.read()
+
+            subject = f"📋 MoneyBot Log Rotated — {filename}"
+            body = (
+                f"Bot log reached {size / 1024 / 1024:.1f}MB and was rotated.\n\n"
+                f"Timestamp : {datetime.now(timezone.utc).isoformat()}\n"
+                f"File      : {filename}\n"
+                f"Size      : {size / 1024:.0f} KB\n\n"
+                f"The log has been cleared on the server.\n"
+                f"Download the attached file to keep a local copy."
+            )
+
+            sent = self.send_with_attachment(subject, body, filename, log_bytes)
+
+            # Truncate the log regardless of whether email succeeded
+            # (to prevent disk from filling up)
+            with open(log_path, "w") as f:
+                f.write(f"[{datetime.now(timezone.utc).isoformat()}] Log rotated "
+                        f"({size / 1024:.0f}KB archived, emailed={sent})\n")
+
+            print(f"[notify] Log rotated: {size/1024:.0f}KB → emailed={sent}")
+            return True
+        except Exception as e:
+            print(f"[notify] Log rotation failed: {e}")
             return False
 
     def training_started(self, steps: list) -> bool:

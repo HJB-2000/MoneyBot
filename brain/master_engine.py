@@ -129,6 +129,7 @@ class MasterEngine:
         self._current_signals_30: dict = {}   # the 30 Bayesian signals
         self._regime_cycle_count: int = 0     # consecutive cycles with same regime
         self._btc_roc: float = 0.0            # BTC 1h rate of change
+        self._brain_cycle_count: int = 0      # total brain cycles, for log rotation
 
     # ------------------------------------------------------------------ #
     #  Startup                                                             #
@@ -235,6 +236,19 @@ class MasterEngine:
         combiner_result = self.combiner.combine(scores, self.signals_map)
         regime = self.regime_detector.classify(scores, combiner_result, self.signals_map)
         route = self.router.route(regime, combiner_result.confidence)
+
+        # Log rotation check every 50 cycles (~4 min)
+        self._brain_cycle_count += 1
+        if self._brain_cycle_count % 50 == 0:
+            try:
+                from scripts.notify import Notifier
+                _log_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "logs", "bot.log"
+                )
+                Notifier().rotate_log(_log_path, max_bytes=3 * 1024 * 1024)
+            except Exception:
+                pass
 
         # Track regime persistence
         if regime == self._current_regime:
