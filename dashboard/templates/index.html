@@ -268,6 +268,24 @@
   </div>
 </div>
 
+<!-- Log size flag bar -->
+<div id="log-flag-bar" style="display:none;padding:0 20px 0">
+  <div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="color:var(--red);font-size:18px">⚠</span>
+      <div>
+        <div style="font-weight:700;color:var(--red);font-size:13px">Log file reached <span id="log-size-display">0MB</span></div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Click to download and clear — bot keeps running</div>
+      </div>
+    </div>
+    <a id="log-download-btn" href="/api/logdownload" style="
+      display:inline-block;padding:8px 20px;background:var(--red);color:#fff;
+      font-weight:700;font-size:12px;border-radius:6px;text-decoration:none;
+      white-space:nowrap;transition:opacity .2s
+    " onclick="setTimeout(checkLogSize, 3000)">Download & Clear Log</a>
+  </div>
+</div>
+
 <!-- Bot activity log — full width -->
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card">
@@ -427,6 +445,21 @@ function renderPairs(pairs) {
       <td class="neg">${p.losses}</td>
       <td class="${colorClass(p.win_rate - 0.5)}">${(p.win_rate * 100).toFixed(1)}%</td>
     </tr>`).join('');
+}
+
+// ── log size flag ───────────────────────────────────────────────────────────
+async function checkLogSize() {
+  try {
+    const res = await fetch('/api/logsize');
+    const d = await res.json();
+    const bar = document.getElementById('log-flag-bar');
+    if (d.flag) {
+      document.getElementById('log-size-display').textContent = d.size_mb.toFixed(1) + 'MB';
+      bar.style.display = 'block';
+    } else {
+      bar.style.display = 'none';
+    }
+  } catch(e) {}
 }
 
 // ── uptime clock (runs every second, no server hit) ─────────────────────────
@@ -727,6 +760,9 @@ setInterval(updateAll, 10000);
 
 updateVolume();
 setInterval(updateVolume, 15000);
+
+checkLogSize();
+setInterval(checkLogSize, 30000);  // check log size every 30s
 
 window.addEventListener('resize', () => {
   fetch('/api/status').then(r=>r.json()).then(d=>{

@@ -88,17 +88,19 @@ class VolatilitySignal:
         return 0.0
 
     def _realized_vol(self, candles: pd.DataFrame, window: int = 12) -> float:
+        self.vol_spike = False  # always reset first so stale True never persists
         closes = candles["close"].values.astype(float)
         volumes = candles["volume"].values.astype(float)
         returns = np.diff(np.log(closes))
         if len(returns) < window:
             return 0.0
 
-        # Volume-based spike detection
+        # Volume-based spike detection — threshold 10x to avoid false positives
+        # (3x triggers during normal active-hours vs overnight baseline)
         if len(volumes) > window:
             recent_vol_avg = volumes[-window:].mean()
             baseline_vol_avg = volumes[:-window].mean()
-            if baseline_vol_avg > 0 and recent_vol_avg / baseline_vol_avg > 3.0:
+            if baseline_vol_avg > 0 and recent_vol_avg / baseline_vol_avg > 10.0:
                 self.vol_spike = True
                 return -0.8
 
@@ -108,7 +110,7 @@ class VolatilitySignal:
 
         recent_rv = returns[-window:].std()
         ratio = recent_rv / daily_rv
-        self.vol_spike = bool(ratio > 3.0)
+        self.vol_spike = bool(ratio > 5.0)  # 3x was too sensitive; 5x = genuine spike
         if self.vol_spike:
             return -0.8
         return 0.0

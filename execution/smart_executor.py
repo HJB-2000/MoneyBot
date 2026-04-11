@@ -1,9 +1,12 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from strategies.base_strategy import Opportunity
 from execution.fill_simulator import FillSimulator
 from execution.order_manager import OrderManager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,11 +46,13 @@ class SmartExecutor:
             if opp.entry_price > 0:
                 price_drift = abs(current_price - opp.entry_price) / opp.entry_price
                 if price_drift > 0.0015:
+                    logger.info(f"EXEC REJECT stale_price {opp.strategy} {opp.pair} drift={price_drift*100:.3f}%")
                     return ExecutionResult(False, "stale_price")
 
         # Check 3 — expiry
         age = (datetime.now(timezone.utc) - opp.detected_at).total_seconds()
         if age > opp.expiry_seconds:
+            logger.info(f"EXEC REJECT expired {opp.strategy} {opp.pair} age={age:.1f}s > {opp.expiry_seconds}s")
             return ExecutionResult(False, "expired")
 
         # Check 4 — re-score
@@ -57,15 +62,18 @@ class SmartExecutor:
         )
         exec_threshold = self._cfg["scoring"]["execution_threshold"]
         if new_score < exec_threshold:
+            logger.info(f"EXEC REJECT score {opp.strategy} {opp.pair} score={new_score:.3f}")
             return ExecutionResult(False, f"score_below_threshold:{new_score:.3f}")
 
         # Check 5 — re-run risk approval
         approval = self._risk.approve(opp, signal_objects)
         if not approval.approved:
+            logger.info(f"EXEC REJECT risk {opp.strategy} {opp.pair} reason={approval.reason}")
             return ExecutionResult(False, f"risk:{approval.reason}")
 
         # Check 6 — API latency
         if self._mr.avg_latency_ms > self._cfg["risk"]["max_api_latency_ms"]:
+            logger.info(f"EXEC REJECT latency {opp.strategy} {opp.pair} lat={self._mr.avg_latency_ms:.0f}ms")
             return ExecutionResult(False, "high_latency")
 
         # --- All checks passed: simulate fill ---

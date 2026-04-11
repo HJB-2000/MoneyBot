@@ -82,7 +82,7 @@ risk:
   circuit_breaker_win_rate: 0.55
   circuit_breaker_no_opp_hours: 2
   volatility_pause_seconds: 300
-  max_api_latency_ms: 200
+  max_api_latency_ms: 500
 
 regime:
   scan_interval_seconds: 30

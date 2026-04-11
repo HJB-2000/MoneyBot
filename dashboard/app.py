@@ -244,6 +244,41 @@ def create_app() -> Flask:
     def logs():
         return jsonify({"lines": _bot_log_tail(80)})
 
+    @app.route("/api/logsize")
+    def logsize():
+        if not BOT_LOG.exists():
+            return jsonify({"size_bytes": 0, "size_mb": 0.0, "flag": False})
+        size = BOT_LOG.stat().st_size
+        return jsonify({
+            "size_bytes": size,
+            "size_mb":    round(size / 1024 / 1024, 2),
+            "flag":       size >= 3 * 1024 * 1024,
+        })
+
+    @app.route("/api/logdownload")
+    def logdownload():
+        from flask import Response
+        if not BOT_LOG.exists() or BOT_LOG.stat().st_size == 0:
+            return Response("(empty)", mimetype="text/plain")
+        content = BOT_LOG.read_bytes()
+        # Truncate log after download
+        try:
+            import time as _t
+            BOT_LOG.write_text(
+                f"[{__import__('datetime').datetime.utcnow().isoformat()}Z] "
+                f"Log cleared after manual download ({len(content)//1024}KB)\n"
+            )
+        except Exception:
+            pass
+        from flask import send_file
+        import io
+        ts = __import__('datetime').datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return Response(
+            content,
+            mimetype="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="bot_{ts}.log"'},
+        )
+
     @app.route("/api/confidence")
     def confidence():
         return jsonify({"history": _confidence_history(100)})

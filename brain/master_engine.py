@@ -129,8 +129,7 @@ class MasterEngine:
         self._current_signals_30: dict = {}   # the 30 Bayesian signals
         self._regime_cycle_count: int = 0     # consecutive cycles with same regime
         self._btc_roc: float = 0.0            # BTC 1h rate of change
-        self._brain_cycle_count: int = 0      # total brain cycles, for log rotation
-        self._last_heartbeat_ts: float = 0.0  # timestamp of last heartbeat email
+        self._brain_cycle_count: int = 0      # total brain cycles
 
     # ------------------------------------------------------------------ #
     #  Startup                                                             #
@@ -158,18 +157,6 @@ class MasterEngine:
             t.start()
 
         self._print_startup()
-
-        # Send startup confirmation email
-        try:
-            from scripts.notify import Notifier
-            _pairs = len(self.config.get("pairs", {}).get("scan_universe", []))
-            _n = Notifier()
-            logger.info(f"Email notifications: {'enabled' if _n.enabled else 'disabled (set GMAIL_* env vars)'}")
-            if _n.enabled:
-                _ok = _n.bot_started(self.tracker.get_capital(), _pairs)
-                logger.info(f"Startup email sent: {_ok}")
-        except Exception as e:
-            logger.warning(f"Startup email failed: {e}")
 
         try:
             while self._running:
@@ -250,36 +237,7 @@ class MasterEngine:
         regime = self.regime_detector.classify(scores, combiner_result, self.signals_map)
         route = self.router.route(regime, combiner_result.confidence)
 
-        # Email checks every 50 cycles (~4 min)
         self._brain_cycle_count += 1
-        if self._brain_cycle_count % 50 == 0:
-            try:
-                from scripts.notify import Notifier
-                _notifier = Notifier()
-                _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-                # Log rotation at 3MB
-                _log_path = os.path.join(_root, "logs", "bot.log")
-                _notifier.rotate_log(_log_path, max_bytes=3 * 1024 * 1024)
-
-                # Heartbeat every 10 hours
-                _now = time.time()
-                if _now - self._last_heartbeat_ts >= 10 * 3600:
-                    import csv as _csv
-                    _cap = self.tracker.get_capital()
-                    _wins, _losses = 0, 0
-                    try:
-                        with open(os.path.join(_root, "data", "trade_log.csv")) as _tf:
-                            for _row in _csv.DictReader(_tf):
-                                if _row.get("result") == "WIN":   _wins += 1
-                                elif _row.get("result") == "LOSS": _losses += 1
-                    except Exception:
-                        pass
-                    _uptime = self._brain_cycle_count * 5 / 3600
-                    _notifier.heartbeat(_cap, _wins + _losses, _wins, _losses, _uptime)
-                    self._last_heartbeat_ts = _now
-            except Exception:
-                pass
 
         # Track regime persistence
         if regime == self._current_regime:
@@ -489,6 +447,10 @@ class MasterEngine:
                     self.pair_ranker, signals_30=signals_30
                 )
                 if score < exec_threshold:
+                    logger.info(
+                        f"SKIP {opp.strategy} {opp.pair} score={score:.3f} "
+                        f"(threshold={exec_threshold})"
+                    )
                     continue
 
                 # Execute
@@ -501,6 +463,11 @@ class MasterEngine:
                         f"score={score:.3f} pnl=${result.net_pnl_usd:.4f}"
                     )
                     self._print_cycle(opp, score, regime, combiner_result)
+                else:
+                    logger.info(
+                        f"EXEC FAILED {opp.strategy} {opp.pair} "
+                        f"score={score:.3f} reason={result.reason}"
+                    )
             except Exception as e:
                 logger.error(f"ExecThread error: {e}", exc_info=True)
 
