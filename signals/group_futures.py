@@ -44,7 +44,7 @@ class FuturesSignals:
             return 0.0
         r = float(rate)
         self.funding_rate = r
-        if r > 0.001:    return 0.3
+        if r >= 0.001:   return 0.3
         elif r > 0.0005: return 0.1
         elif r >= -0.0002: return 0.0
         elif r >= -0.0005: return -0.1
@@ -121,10 +121,14 @@ class FuturesSignals:
     def _calc_vwap(self, candles: pd.DataFrame) -> float:
         df = candles.copy()
         if "timestamp" in df.columns and pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-            today_start = pd.Timestamp.now().normalize()  # tz-naive to match candle timestamps
-            today_df = df[df["timestamp"] >= today_start]
-            if len(today_df) > 0:
-                df = today_df
+            try:
+                tz = df["timestamp"].dt.tz
+                today_start = pd.Timestamp.now(tz=tz).normalize() if tz else pd.Timestamp.now().normalize()
+                today_df = df[df["timestamp"] >= today_start]
+                if len(today_df) > 0:
+                    df = today_df
+            except Exception:
+                pass  # skip today filter if tz comparison fails
         typical  = (df["high"] + df["low"] + df["close"]) / 3
         cumvol   = df["volume"].cumsum()
         if cumvol.iloc[-1] == 0:

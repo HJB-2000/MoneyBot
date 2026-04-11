@@ -123,6 +123,8 @@ class MasterEngine:
         self._current_regime: str = "CHOPPY"
         self._current_route = None
         self._current_signals_30: dict = {}   # the 30 Bayesian signals
+        self._regime_cycle_count: int = 0     # consecutive cycles with same regime
+        self._btc_roc: float = 0.0            # BTC 1h rate of change
 
     # ------------------------------------------------------------------ #
     #  Startup                                                             #
@@ -230,6 +232,12 @@ class MasterEngine:
         regime = self.regime_detector.classify(scores, combiner_result, self.signals_map)
         route = self.router.route(regime, combiner_result.confidence)
 
+        # Track regime persistence
+        if regime == self._current_regime:
+            self._regime_cycle_count += 1
+        else:
+            self._regime_cycle_count = 0
+
         self._current_signals = scores
         self._current_signal_objects = dict(self.signals_map)
         self._current_signal_objects["_combiner_result"] = combiner_result
@@ -239,6 +247,16 @@ class MasterEngine:
         self._current_regime = regime
         self._current_route = route
 
+        # BTC rate of change (1h proxy using last 12 x 5m candles)
+        try:
+            btc_candles = mr.get_candles("BTC/USDT", timeframe="5m", limit=20)
+            if btc_candles is not None and len(btc_candles) >= 12:
+                c0 = float(btc_candles["close"].iloc[-12])
+                c1 = float(btc_candles["close"].iloc[-1])
+                self._btc_roc = (c1 - c0) / c0 if c0 > 0 else 0.0
+        except Exception:
+            pass
+
         # Compute 30 Bayesian signals
         try:
             c_scores = self._candle_sig.calculate(candles)
@@ -247,15 +265,33 @@ class MasterEngine:
             t_scores = self._trade_sig.calculate(trades or [], candles)
             f_scores = self._futures_sig.calculate(funding, oi, liquidations,
                                                    candles, oi_1h_ago=oi_1h_ago)
-            d_scores = self._derived_sig.calculate(c_scores, t_scores)
+            d_scores = self._derived_sig.calculate(
+                c_scores, t_scores,
+                regime_cycles=self._regime_cycle_count,
+                btc_roc=self._btc_roc,
+                pair_btc_corr=0.82,  # SOL/BTC correlation — high but not 1.0
+            )
             self._current_signals_30 = {**c_scores, **ob_scores,
                                         **t_scores, **f_scores, **d_scores}
             # Write to file so dashboard can read live signal values
             try:
                 import json as _json
-                _sig_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "live_signals_30.json")
-                with open(_sig_path, "w") as _f:
+                _data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+                # Write live signal scores
+                with open(os.path.join(_data_dir, "live_signals_30.json"), "w") as _f:
                     _json.dump(self._current_signals_30, _f)
+                # Write live market candles (last 50) for volume chart
+                if candles is not None and len(candles) >= 1:
+                    _candle_rows = []
+                    for _, row in candles.tail(50).iterrows():
+                        _candle_rows.append({
+                            "ts":     str(row["timestamp"])[:19],
+                            "open":   float(row["open"]),
+                            "close":  float(row["close"]),
+                            "volume": float(row["volume"]),
+                        })
+                    with open(os.path.join(_data_dir, "live_market.json"), "w") as _f:
+                        _json.dump({"candles": _candle_rows, "symbol": sym}, _f)
             except Exception:
                 pass
         except Exception as e:

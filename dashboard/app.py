@@ -211,6 +211,16 @@ def create_app() -> Flask:
         m, s = divmod(rem, 60)
         return jsonify({"seconds": secs, "display": f"{h:02d}:{m:02d}:{s:02d}"})
 
+    @app.route("/api/volume")
+    def volume():
+        live_market = ROOT / "data" / "live_market.json"
+        if live_market.exists() and live_market.stat().st_size > 0:
+            try:
+                return jsonify(json.loads(live_market.read_text()))
+            except Exception:
+                pass
+        return jsonify({"candles": []})
+
     @app.route("/api/signals30")
     def signals30():
         if LIVE_SIGNALS_30.exists() and LIVE_SIGNALS_30.stat().st_size > 0:
