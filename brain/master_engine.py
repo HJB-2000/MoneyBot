@@ -163,9 +163,13 @@ class MasterEngine:
         try:
             from scripts.notify import Notifier
             _pairs = len(self.config.get("pairs", {}).get("scan_universe", []))
-            Notifier().bot_started(self.tracker.get_capital(), _pairs)
-        except Exception:
-            pass
+            _n = Notifier()
+            logger.info(f"Email notifications: {'enabled' if _n.enabled else 'disabled (set GMAIL_* env vars)'}")
+            if _n.enabled:
+                _ok = _n.bot_started(self.tracker.get_capital(), _pairs)
+                logger.info(f"Startup email sent: {_ok}")
+        except Exception as e:
+            logger.warning(f"Startup email failed: {e}")
 
         try:
             while self._running:
