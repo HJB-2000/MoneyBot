@@ -203,6 +203,8 @@ class MasterEngine:
         trades = mr.get_trades(sym)
         funding = mr.get_funding_rate(sym)
         oi = mr.get_open_interest(sym)
+        oi_1h_ago = mr.get_oi_1h_ago(sym)
+        liquidations = mr.get_liquidations(sym)
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {
@@ -243,8 +245,8 @@ class MasterEngine:
             ob_scores = self._ob_sig.calculate(ob or {"bids": [], "asks": []},
                                                trade_size_usd=50.0)
             t_scores = self._trade_sig.calculate(trades or [], candles)
-            f_scores = self._futures_sig.calculate(funding or 0.0, oi or 1000,
-                                                   trades or [], candles)
+            f_scores = self._futures_sig.calculate(funding, oi, liquidations,
+                                                   candles, oi_1h_ago=oi_1h_ago)
             d_scores = self._derived_sig.calculate(c_scores, t_scores)
             self._current_signals_30 = {**c_scores, **ob_scores,
                                         **t_scores, **f_scores, **d_scores}
