@@ -48,7 +48,7 @@ class StatArbStrategy(BaseStrategy):
         # Batch-fetch all unique tickers in parallel (was 2× get_ticker per pair = dozens of serial calls)
         unique_syms = {s for pair in self._corr_pairs for s in pair}
         ticker_cache: dict = {}
-        with ThreadPoolExecutor(max_workers=min(len(unique_syms), 12)) as pool:
+        with ThreadPoolExecutor(max_workers=min(len(unique_syms), 6)) as pool:
             fut_map = {pool.submit(market_reader.get_ticker, sym): sym for sym in unique_syms}
             done, _ = wait(list(fut_map.keys()), timeout=8)
         for f in done:

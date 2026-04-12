@@ -41,7 +41,7 @@ class SentimentSignal:
         short_liq = sum(l.get("amount", 0) for l in liquidations if l.get("side") == "short")
         total = long_liq + short_liq
         if total == 0:
-            return 0.2
+            return 0.0  # liquidations present but no side data = neutral
 
         self.long_liquidation_cascade = long_liq / total > 0.8
 

@@ -25,10 +25,10 @@ strategies:
   stat_arb:
     enabled: true
     correlation_threshold: 0.85
-    z_score_entry: 2.0
+    z_score_entry: 2.5
     z_score_exit: 0.5
     z_score_stop: 3.5
-    max_hold_hours: 4
+    max_hold_hours: 1
     stop_loss_pct: 0.015
   funding_arb:
     enabled: true
@@ -42,7 +42,7 @@ strategies:
     capital_per_grid_pct: 0.15
   mean_reversion:
     enabled: true
-    drop_threshold_pct: 0.02
+    drop_threshold_pct: 0.012
     drop_window_minutes: 5
     target_recovery_pct: 0.01
     stop_loss_pct: 0.015
@@ -72,7 +72,7 @@ signal_weights:
 
 scoring:
   observation_threshold: 0.30
-  execution_threshold: 0.55
+  execution_threshold: 0.52
 
 risk:
   max_daily_loss_pct: 0.05
@@ -83,6 +83,7 @@ risk:
   circuit_breaker_no_opp_hours: 2
   volatility_pause_seconds: 300
   max_api_latency_ms: 500
+  max_stat_arb_positions: 1
 
 regime:
   scan_interval_seconds: 30

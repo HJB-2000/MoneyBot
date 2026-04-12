@@ -175,16 +175,24 @@
     <div class="card-sub" id="total-pnl">Total P&L: —</div>
   </div>
   <!-- Log download button — grey until 3MB, green when ready -->
-  <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px">
+  <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px">
     <div class="card-title" style="text-align:center">Bot Log</div>
     <a id="log-download-btn" href="/api/logdownload"
        onclick="setTimeout(checkLogSize,3000)"
-       style="display:block;width:100%;padding:10px 0;text-align:center;font-weight:700;
-              font-size:13px;border-radius:8px;text-decoration:none;transition:background .4s,color .4s;
+       style="display:block;width:100%;padding:8px 0;text-align:center;font-weight:700;
+              font-size:12px;border-radius:8px;text-decoration:none;transition:background .4s,color .4s;
               background:rgba(100,116,139,.15);color:var(--muted);border:1px solid var(--border)">
-      Download &amp; Clear
+      Bot Log &amp; Clear
     </a>
     <div id="log-status-text" style="font-size:11px;color:var(--muted);text-align:center">Waiting…</div>
+    <a id="decision-download-btn" href="/api/decisionlogdownload"
+       onclick="setTimeout(checkDecisionLogSize,3000)"
+       style="display:block;width:100%;padding:8px 0;text-align:center;font-weight:700;
+              font-size:12px;border-radius:8px;text-decoration:none;transition:background .4s,color .4s;
+              background:rgba(100,116,139,.15);color:var(--muted);border:1px solid var(--border)">
+      Decision Log &amp; Clear
+    </a>
+    <div id="decision-status-text" style="font-size:11px;color:var(--muted);text-align:center">Waiting…</div>
   </div>
 </div>
 
@@ -301,6 +309,43 @@
   </div>
 </div>
 
+
+<!-- Decision audit log — full width -->
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;gap:12px">
+      Decision Audit Log
+      <span style="color:var(--muted);font-size:10px">(last 20 decisions)</span>
+      <span id="decision-log-count" style="color:var(--muted);font-size:10px;margin-left:auto"></span>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="color:var(--muted);text-align:left;border-bottom:1px solid var(--border)">
+        <th style="padding:4px 6px">Time</th>
+        <th style="padding:4px 6px">Strategy</th>
+        <th style="padding:4px 6px">Pair</th>
+        <th style="padding:4px 6px">Regime</th>
+        <th style="padding:4px 6px">Decision</th>
+        <th style="padding:4px 6px">Score</th>
+        <th style="padding:4px 6px">Reject Reason</th>
+        <th style="padding:4px 6px">PA</th>
+        <th style="padding:4px 6px">Mom</th>
+        <th style="padding:4px 6px">Micro</th>
+        <th style="padding:4px 6px">Vol</th>
+        <th style="padding:4px 6px">Sent</th>
+        <th style="padding:4px 6px">CVD</th>
+        <th style="padding:4px 6px">VWAP</th>
+        <th style="padding:4px 6px">Whale</th>
+        <th style="padding:4px 6px">Conf</th>
+        <th style="padding:4px 6px">Dominant</th>
+      </tr></thead>
+      <tbody id="decision-audit-body">
+        <tr><td colspan="17" style="color:var(--muted);text-align:center;padding:12px">No decisions yet</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
 
 <!-- Bot activity log — full width -->
 <div class="grid" style="grid-template-columns:1fr">
@@ -504,6 +549,63 @@ function renderPairs(pairs) {
       <td class="neg">${p.losses}</td>
       <td class="${colorClass(p.win_rate - 0.5)}">${(p.win_rate * 100).toFixed(1)}%</td>
     </tr>`).join('');
+}
+
+// ── decision audit log ──────────────────────────────────────────────────────
+async function updateDecisionLog() {
+  try {
+    const res = await fetch('/api/decisionlog');
+    const rows = await res.json();
+    const tbody = document.getElementById('decision-audit-body');
+    const count = document.getElementById('decision-log-count');
+    if (!rows.length) return;
+    count.textContent = `(${rows.length} shown)`;
+    const sigColor = v => v > 0.05 ? 'var(--green)' : v < -0.05 ? 'var(--red)' : 'var(--muted)';
+    const decColor = d => d === 'EXECUTED' ? 'var(--green)' : d === 'SKIP' ? 'var(--muted)' : 'var(--red)';
+    const fmt3 = v => (v >= 0 ? '+' : '') + v.toFixed(3);
+    tbody.innerHTML = rows.map(r => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:3px 6px;color:var(--muted);white-space:nowrap">${r.ts.slice(11)}</td>
+        <td style="padding:3px 6px;color:var(--blue)">${r.strategy.replace(/_/g,' ')}</td>
+        <td style="padding:3px 6px;font-weight:600">${r.pair}</td>
+        <td style="padding:3px 6px;color:var(--muted)">${r.regime}</td>
+        <td style="padding:3px 6px;font-weight:700;color:${decColor(r.decision)}">${r.decision}</td>
+        <td style="padding:3px 6px">${r.score.toFixed(3)} <span style="color:var(--muted);font-size:10px">/${r.threshold.toFixed(2)}</span></td>
+        <td style="padding:3px 6px;color:var(--red);font-size:10px;max-width:150px;overflow:hidden;text-overflow:ellipsis">${r.reject||'—'}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_pa)}">${fmt3(r.sig_pa)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_mom)}">${fmt3(r.sig_mom)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_micro)}">${fmt3(r.sig_micro)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_vol)}">${fmt3(r.sig_vol)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_sent)}">${fmt3(r.sig_sent)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_cvd)}">${fmt3(r.sig_cvd)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_vwap)}">${fmt3(r.sig_vwap)}</td>
+        <td style="padding:3px 6px;color:${sigColor(r.sig_whale)}">${fmt3(r.sig_whale)}</td>
+        <td style="padding:3px 6px">${(r.confidence*100).toFixed(0)}%</td>
+        <td style="padding:3px 6px;color:var(--cyan);font-size:10px">${r.dominant||'—'}</td>
+      </tr>`).join('');
+  } catch(e) {}
+}
+
+async function checkDecisionLogSize() {
+  try {
+    const res = await fetch('/api/decisionlogsize');
+    const d = await res.json();
+    const btn = document.getElementById('decision-download-btn');
+    const txt = document.getElementById('decision-status-text');
+    if (d.flag) {
+      btn.style.background = 'rgba(34,197,94,.2)';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'rgba(34,197,94,.4)';
+      txt.textContent = 'Decision log ready';
+      txt.style.color = 'var(--green)';
+    } else {
+      btn.style.background = 'rgba(100,116,139,.15)';
+      btn.style.color = 'var(--muted)';
+      btn.style.borderColor = 'var(--border)';
+      txt.textContent = d.size_mb > 0 ? d.size_mb.toFixed(2) + ' MB / 1 MB' : 'No decisions yet';
+      txt.style.color = 'var(--muted)';
+    }
+  } catch(e) {}
 }
 
 // ── log size flag ───────────────────────────────────────────────────────────
@@ -838,6 +940,12 @@ setInterval(updateVolume, 15000);
 
 checkLogSize();
 setInterval(checkLogSize, 30000);  // check log size every 30s
+
+checkDecisionLogSize();
+setInterval(checkDecisionLogSize, 30000);  // check decision log size every 30s
+
+updateDecisionLog();
+setInterval(updateDecisionLog, 15000);  // refresh decision audit every 15s
 
 updateOpenPositions();
 setInterval(updateOpenPositions, 5000);  // refresh open positions every 5s

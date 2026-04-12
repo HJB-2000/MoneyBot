@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import queue
@@ -436,9 +437,18 @@ class MasterEngine:
                 slow = [futures[f] for f in pending]
                 logger.warning(f"Scan timeout: {slow} did not finish in 25s — skipped")
 
+        # Deduplicate: keep only the best opportunity per (strategy, pair) — prevents
+        # stat_arb flooding the queue with 5+ identical pair entries from different correlations.
+        seen: dict = {}
+        for opp in all_opportunities:
+            key = (opp.strategy, opp.pair)
+            if key not in seen or opp.net_profit_pct > seen[key].net_profit_pct:
+                seen[key] = opp
+        deduped = list(seen.values())
+
         # Put each opportunity on the queue
         count = 0
-        for opp in all_opportunities:
+        for opp in deduped:
             try:
                 self.opp_queue.put_nowait((opp, signals, combiner_result, signal_objects, regime, signals_30))
                 count += 1
@@ -447,6 +457,62 @@ class MasterEngine:
 
         if count > 0:
             logger.info(f"Scan found {count} opportunities (regime={regime})")
+
+    # ------------------------------------------------------------------ #
+    #  Decision audit log                                                  #
+    # ------------------------------------------------------------------ #
+
+    _AUDIT_PATH = "data/decision_audit.csv"
+    _AUDIT_HEADER = [
+        "timestamp", "strategy", "pair", "regime", "direction",
+        "sig_price_action", "sig_momentum", "sig_microstructure",
+        "sig_volatility", "sig_sentiment", "sig_cvd", "sig_vwap", "sig_whale",
+        "combiner_score", "combiner_confidence", "combiner_dominant", "arb_friendly",
+        "opportunity_score", "exec_threshold", "decision", "reject_reason",
+        "entry_price", "net_profit_pct", "liquidity_ratio", "expiry_s", "age_s",
+    ]
+
+    def _write_decision_audit(self, opp, signals: dict, combiner_result,
+                               score: float, exec_threshold: float,
+                               decision: str, reject_reason: str = ""):
+        try:
+            write_header = not os.path.exists(self._AUDIT_PATH) or \
+                           os.path.getsize(self._AUDIT_PATH) == 0
+            age_s = round(
+                (datetime.now(timezone.utc) - opp.detected_at).total_seconds(), 1
+            ) if hasattr(opp, "detected_at") and opp.detected_at else 0
+            cr = combiner_result
+            row = [
+                datetime.now(timezone.utc).isoformat(),
+                opp.strategy, opp.pair, getattr(opp, "regime", ""),
+                getattr(opp, "direction", ""),
+                round(signals.get("price_action", 0), 4),
+                round(signals.get("momentum", 0), 4),
+                round(signals.get("microstructure", 0), 4),
+                round(signals.get("volatility", 0), 4),
+                round(signals.get("sentiment", 0), 4),
+                round(signals.get("cvd", 0), 4),
+                round(signals.get("vwap", 0), 4),
+                round(signals.get("whale", 0), 4),
+                round(getattr(cr, "score", 0), 4),
+                round(getattr(cr, "confidence", 0), 4),
+                getattr(cr, "dominant_signal", ""),
+                getattr(cr, "arb_friendly", False),
+                round(score, 4), round(exec_threshold, 4),
+                decision, reject_reason,
+                getattr(opp, "entry_price", 0),
+                round(getattr(opp, "net_profit_pct", 0), 6),
+                round(getattr(opp, "liquidity_ratio", 0), 2),
+                getattr(opp, "expiry_seconds", 0),
+                age_s,
+            ]
+            with open(self._AUDIT_PATH, "a", newline="") as f:
+                w = csv.writer(f)
+                if write_header:
+                    w.writerow(self._AUDIT_HEADER)
+                w.writerow(row)
+        except Exception:
+            pass  # never let audit logging crash the bot
 
     # ------------------------------------------------------------------ #
     #  Thread 4 — Execution                                                #
@@ -480,6 +546,10 @@ class MasterEngine:
                         f"SKIP {opp.strategy} {opp.pair} score={score:.3f} "
                         f"(threshold={exec_threshold})"
                     )
+                    self._write_decision_audit(
+                        opp, signals, combiner_result, score, exec_threshold,
+                        "SKIP", f"score_below_threshold:{score:.3f}"
+                    )
                     continue
 
                 # Execute
@@ -491,11 +561,19 @@ class MasterEngine:
                         f"EXECUTED {opp.strategy} {opp.pair} "
                         f"score={score:.3f} pnl=${result.net_pnl_usd:.4f}"
                     )
+                    self._write_decision_audit(
+                        opp, signals, combiner_result, score, exec_threshold,
+                        "EXECUTED"
+                    )
                     self._print_cycle(opp, score, regime, combiner_result)
                 else:
                     logger.info(
                         f"EXEC FAILED {opp.strategy} {opp.pair} "
                         f"score={score:.3f} reason={result.reason}"
+                    )
+                    self._write_decision_audit(
+                        opp, signals, combiner_result, score, exec_threshold,
+                        "REJECTED", result.reason
                     )
             except Exception as e:
                 logger.error(f"ExecThread error: {e}", exc_info=True)

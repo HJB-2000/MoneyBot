@@ -70,8 +70,19 @@ class VolatilitySignal:
         price = closes[-1]
         bandwidth = (upper - lower) / mid
 
-        # Check squeeze
-        self.is_squeezing = bool(bandwidth < 0.001)
+        # Squeeze: band is tighter than average OR absolutely very tight (<0.5%)
+        rm = pd.Series(closes).rolling(period).mean()
+        rs = pd.Series(closes).rolling(period).std()
+        bw_history = ((rm + 2 * rs - (rm - 2 * rs)) / rm).dropna().values
+        if len(bw_history) >= 5:
+            avg_bw = float(bw_history[:-1].mean())
+            squeeze_vs_avg = (
+                not np.isnan(avg_bw) and avg_bw > 0
+                and bandwidth < avg_bw * 0.75
+            )
+        else:
+            squeeze_vs_avg = False
+        self.is_squeezing = bool(squeeze_vs_avg or bandwidth < 0.005)
 
         if self.is_squeezing:
             return -0.2

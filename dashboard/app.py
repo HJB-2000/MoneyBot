@@ -10,6 +10,7 @@ import os
 import sqlite3
 import time
 from pathlib import Path
+from datetime import datetime
 
 _START_TIME = time.time()
 
@@ -26,6 +27,7 @@ WEIGHTS_FILE   = ROOT / "data" / "signal_weights.json"
 PAIR_CSV       = ROOT / "data" / "pair_rankings.csv"
 BOT_LOG          = ROOT / "logs" / "bot.log"
 LIVE_SIGNALS_30  = ROOT / "data" / "live_signals_30.json"
+DECISION_AUDIT   = ROOT / "data" / "decision_audit.csv"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -311,6 +313,69 @@ def create_app() -> Flask:
             content,
             mimetype="text/plain",
             headers={"Content-Disposition": f'attachment; filename="bot_{ts}.log"'},
+        )
+
+    @app.route("/api/decisionlogsize")
+    def decisionlogsize():
+        if not DECISION_AUDIT.exists():
+            return jsonify({"size_bytes": 0, "size_mb": 0.0, "flag": False})
+        size = DECISION_AUDIT.stat().st_size
+        return jsonify({
+            "size_bytes": size,
+            "size_mb":    round(size / 1024 / 1024, 2),
+            "flag":       size >= 1 * 1024 * 1024,
+        })
+
+    @app.route("/api/decisionlog")
+    def decisionlog():
+        rows = _read_csv_tail(DECISION_AUDIT, 50)
+        out = []
+        for r in reversed(rows):
+            out.append({
+                "ts":          r.get("timestamp", "")[:19],
+                "strategy":    r.get("strategy", ""),
+                "pair":        r.get("pair", ""),
+                "regime":      r.get("regime", ""),
+                "decision":    r.get("decision", ""),
+                "score":       _safe_float(r.get("opportunity_score")),
+                "threshold":   _safe_float(r.get("exec_threshold")),
+                "reject":      r.get("reject_reason", ""),
+                "sig_pa":      _safe_float(r.get("sig_price_action")),
+                "sig_mom":     _safe_float(r.get("sig_momentum")),
+                "sig_micro":   _safe_float(r.get("sig_microstructure")),
+                "sig_vol":     _safe_float(r.get("sig_volatility")),
+                "sig_sent":    _safe_float(r.get("sig_sentiment")),
+                "sig_cvd":     _safe_float(r.get("sig_cvd")),
+                "sig_vwap":    _safe_float(r.get("sig_vwap")),
+                "sig_whale":   _safe_float(r.get("sig_whale")),
+                "confidence":  _safe_float(r.get("combiner_confidence")),
+                "dominant":    r.get("combiner_dominant", ""),
+                "arb_friendly": r.get("arb_friendly", ""),
+            })
+        return jsonify(out)
+
+    @app.route("/api/decisionlogdownload")
+    def decisionlogdownload():
+        from flask import Response
+        if not DECISION_AUDIT.exists() or DECISION_AUDIT.stat().st_size == 0:
+            return Response("(empty)", mimetype="text/plain")
+        content = DECISION_AUDIT.read_bytes()
+        try:
+            # Keep header row, clear the rest
+            lines = content.decode("utf-8", errors="replace").splitlines()
+            header = lines[0] if lines else ""
+            ts_str = datetime.utcnow().isoformat()
+            DECISION_AUDIT.write_text(
+                header + "\n" +
+                f"# Cleared after download at {ts_str}Z\n"
+            )
+        except Exception:
+            pass
+        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return Response(
+            content,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="decisions_{ts}.csv"'},
         )
 
     @app.route("/api/confidence")
