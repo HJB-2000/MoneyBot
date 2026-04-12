@@ -93,18 +93,37 @@ class OrderManager:
                                 pos["stop_price"] = trail_stop
                                 dirty = True
 
+                # Update last seen price (for dashboard display)
+                pos["current_price"] = price
+                dirty = True
+
                 # ── exit checks ─────────────────────────────────────────
                 reason = None
-                if direction == "long":
-                    if pos["target_price"] and price >= pos["target_price"]:
-                        reason = "target"
-                    elif pos["stop_price"] and price <= pos["stop_price"]:
-                        reason = "stop"
-                elif direction == "short":
-                    if pos["target_price"] and price <= pos["target_price"]:
-                        reason = "target"
-                    elif pos["stop_price"] and price >= pos["stop_price"]:
-                        reason = "stop"
+
+                # Quick scalp: take profit at 2× fees (0.4%) if low-confidence trade
+                # High-confidence trades (score ≥ 0.80) skip this and run to target
+                FEES_ROUND_TRIP = 0.004   # 0.4% = 2× taker fees
+                HIGH_CONF_SCORE = 0.80
+                entry_score = pos.get("score", 0) or 0
+                if entry > 0 and not (entry_score >= HIGH_CONF_SCORE):
+                    if direction == "long":
+                        gain_pct = (price - entry) / entry
+                    else:
+                        gain_pct = (entry - price) / entry
+                    if gain_pct >= FEES_ROUND_TRIP:
+                        reason = "quick_profit"
+
+                if reason is None:
+                    if direction == "long":
+                        if pos["target_price"] and price >= pos["target_price"]:
+                            reason = "target"
+                        elif pos["stop_price"] and price <= pos["stop_price"]:
+                            reason = "stop"
+                    elif direction == "short":
+                        if pos["target_price"] and price <= pos["target_price"]:
+                            reason = "target"
+                        elif pos["stop_price"] and price >= pos["stop_price"]:
+                            reason = "stop"
 
                 if hold_secs >= pos.get("hold_max_seconds", 3600):
                     reason = "time_stop"

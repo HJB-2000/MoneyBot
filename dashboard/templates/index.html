@@ -162,6 +162,7 @@
   <div class="card">
     <div class="card-title">Capital</div>
     <div class="card-value" id="balance">$0.00</div>
+    <div class="card-sub" id="available-sub" style="font-size:11px;color:var(--muted)">Available: — / In trades: —</div>
     <div class="card-sub" id="daily-pnl">Daily P&L: —</div>
   </div>
   <div class="card">
@@ -274,8 +275,8 @@
   <div class="card">
     <div class="card-title">Open Positions <span id="open-pos-count" style="color:var(--muted);font-size:10px"></span></div>
     <table>
-      <thead><tr><th>Strategy</th><th>Pair</th><th>Dir</th><th>Entry</th><th>Target</th><th>Stop</th><th>Size</th><th>Age</th></tr></thead>
-      <tbody id="open-pos-body"><tr><td colspan="8" style="color:var(--muted);text-align:center">No open positions</td></tr></tbody>
+      <thead><tr><th>Strategy</th><th>Pair</th><th>Dir</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Target</th><th>Stop</th><th>Size</th><th>Age</th></tr></thead>
+      <tbody id="open-pos-body"><tr><td colspan="10" style="color:var(--muted);text-align:center">No open positions</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -318,9 +319,9 @@
       <span style="color:var(--muted);font-size:10px">(last 20 decisions)</span>
       <span id="decision-log-count" style="color:var(--muted);font-size:10px;margin-left:auto"></span>
     </div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;overflow-y:auto;max-height:420px">
     <table style="width:100%;border-collapse:collapse;font-size:11px">
-      <thead><tr style="color:var(--muted);text-align:left;border-bottom:1px solid var(--border)">
+      <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr style="color:var(--muted);text-align:left;border-bottom:1px solid var(--border)">
         <th style="padding:4px 6px">Time</th>
         <th style="padding:4px 6px">Strategy</th>
         <th style="padding:4px 6px">Pair</th>
@@ -484,7 +485,7 @@ function renderOpenPositions(positions) {
   const tbody = document.getElementById('open-pos-body');
   const count = document.getElementById('open-pos-count');
   if (!positions.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center">No open positions</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--muted);text-align:center">No open positions</td></tr>';
     count.textContent = '';
     return;
   }
@@ -495,6 +496,8 @@ function renderOpenPositions(positions) {
       <td><strong>${p.pair}</strong></td>
       <td><span style="color:${p.direction==='long'?'var(--green)':'var(--red)'}">${p.direction.toUpperCase()}</span></td>
       <td>${fmtPrice(p.entry)}</td>
+      <td>${fmtPrice(p.current)}</td>
+      <td class="${colorClass(p.unreal_pct)}">${p.unreal_pct >= 0 ? '+' : ''}${(p.unreal_pct * 100).toFixed(3)}% <span style="color:var(--muted);font-size:10px">(${p.unreal_usd >= 0 ? '+' : ''}$${p.unreal_usd.toFixed(4)})</span></td>
       <td class="pos">${fmtPrice(p.target)}</td>
       <td class="neg">${fmtPrice(p.stop)}</td>
       <td>$${p.size.toFixed(2)}</td>
@@ -559,7 +562,7 @@ async function updateDecisionLog() {
     const tbody = document.getElementById('decision-audit-body');
     const count = document.getElementById('decision-log-count');
     if (!rows.length) return;
-    count.textContent = `(${rows.length} shown)`;
+    count.textContent = `(${rows.length} shown — scroll for more)`;
     const sigColor = v => v > 0.05 ? 'var(--green)' : v < -0.05 ? 'var(--red)' : 'var(--muted)';
     const decColor = d => d === 'EXECUTED' ? 'var(--green)' : d === 'SKIP' ? 'var(--muted)' : 'var(--red)';
     const fmt3 = v => (v >= 0 ? '+' : '') + v.toFixed(3);
@@ -665,6 +668,10 @@ async function update() {
 
     const bal = d.capital.balance;
     document.getElementById('balance').textContent = '$' + bal.toFixed(2);
+    const avail = d.capital.available ?? bal;
+    const resv  = d.capital.reserved  ?? 0;
+    document.getElementById('available-sub').textContent =
+      `Available: $${avail.toFixed(2)} / In trades: $${resv.toFixed(2)}`;
     const dp = d.capital.daily_pnl;
     document.getElementById('daily-pnl').innerHTML =
       `Daily P&L: <span class="${colorClass(dp)}">${dp >= 0 ? '+' : ''}$${dp.toFixed(2)}</span>`;

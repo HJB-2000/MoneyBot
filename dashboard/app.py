@@ -28,6 +28,7 @@ PAIR_CSV       = ROOT / "data" / "pair_rankings.csv"
 BOT_LOG          = ROOT / "logs" / "bot.log"
 LIVE_SIGNALS_30  = ROOT / "data" / "live_signals_30.json"
 DECISION_AUDIT   = ROOT / "data" / "decision_audit.csv"
+OPEN_ORDERS      = ROOT / "data" / "open_orders.json"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -260,17 +261,33 @@ def create_app() -> Flask:
                     age_s = int((datetime.now(timezone.utc) - dt).total_seconds())
                 except Exception:
                     pass
+                entry = _safe_float(p.get("entry_price"))
+                current = _safe_float(p.get("current_price", 0)) or entry
+                direction = p.get("direction", "long")
+                size = _safe_float(p.get("size_usd"))
+                if entry > 0 and current > 0:
+                    if direction == "long":
+                        unreal_pct = (current - entry) / entry
+                    else:
+                        unreal_pct = (entry - current) / entry
+                    unreal_usd = round(size * unreal_pct, 4)
+                else:
+                    unreal_pct = 0.0
+                    unreal_usd = 0.0
                 out.append({
-                    "id":       pid,
-                    "strategy": p.get("strategy", ""),
-                    "pair":     p.get("pair", ""),
-                    "direction":p.get("direction", ""),
-                    "entry":    _safe_float(p.get("entry_price")),
-                    "size":     _safe_float(p.get("size_usd")),
-                    "target":   _safe_float(p.get("target_price")),
-                    "stop":     _safe_float(p.get("stop_price")),
-                    "age_s":    age_s,
-                    "regime":   p.get("regime", ""),
+                    "id":         pid,
+                    "strategy":   p.get("strategy", ""),
+                    "pair":       p.get("pair", ""),
+                    "direction":  direction,
+                    "entry":      entry,
+                    "current":    current,
+                    "size":       size,
+                    "target":     _safe_float(p.get("target_price")),
+                    "stop":       _safe_float(p.get("stop_price")),
+                    "unreal_pct": round(unreal_pct * 100, 3),
+                    "unreal_usd": unreal_usd,
+                    "age_s":      age_s,
+                    "regime":     p.get("regime", ""),
                 })
             return jsonify(out)
         except Exception:
@@ -328,7 +345,7 @@ def create_app() -> Flask:
 
     @app.route("/api/decisionlog")
     def decisionlog():
-        rows = _read_csv_tail(DECISION_AUDIT, 50)
+        rows = _read_csv_tail(DECISION_AUDIT, 20)
         out = []
         for r in reversed(rows):
             out.append({
@@ -386,11 +403,23 @@ def create_app() -> Flask:
     def signals():
         return jsonify(_signal_history())
 
+    def _reserved_in_trades() -> float:
+        """Sum of size_usd for all currently open positions."""
+        try:
+            if OPEN_ORDERS.exists() and OPEN_ORDERS.stat().st_size > 0:
+                with open(OPEN_ORDERS) as f:
+                    positions = json.load(f)
+                return round(sum(float(p.get("size_usd", 0)) for p in positions.values()), 2)
+        except Exception:
+            pass
+        return 0.0
+
     @app.route("/api/status")
     def status():
         cap = _capital_from_db()
         daily_pnl, drawdown = _daily_pnl_and_drawdown(cap["history"])
         trades = _recent_trades(20)
+        reserved = _reserved_in_trades()
 
         # Win/loss stats from recent trades
         wins   = sum(1 for t in trades if t["result"] == "WIN")
@@ -402,6 +431,8 @@ def create_app() -> Flask:
         return jsonify({
             "capital": {
                 "balance":    round(cap["balance"], 2),
+                "reserved":   reserved,
+                "available":  round(max(0.0, cap["balance"] - reserved), 2),
                 "daily_pnl":  daily_pnl,
                 "drawdown":   drawdown,
                 "milestones": cap["milestones"],

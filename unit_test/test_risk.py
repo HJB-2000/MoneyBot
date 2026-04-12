@@ -62,7 +62,7 @@ def test_approve_rejects_daily_loss_limit(config):
 def test_approve_rejects_max_open_trades(config):
     tracker = make_tracker()
     risk = RiskManager(config, tracker, PositionSizer(config, tracker))
-    risk._open_trades = ["a", "b", "c"]
+    risk._open_trades = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
     assert risk.approve(make_opp()).approved is False
 
 

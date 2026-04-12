@@ -72,18 +72,18 @@ signal_weights:
 
 scoring:
   observation_threshold: 0.30
-  execution_threshold: 0.52
+  execution_threshold: 0.60
 
 risk:
   max_daily_loss_pct: 0.05
-  max_open_trades: 3
+  max_open_trades: 10
   circuit_breaker_losses: 3
   circuit_breaker_drawdown: 0.15
   circuit_breaker_win_rate: 0.55
   circuit_breaker_no_opp_hours: 2
   volatility_pause_seconds: 300
   max_api_latency_ms: 500
-  max_stat_arb_positions: 1
+  max_stat_arb_positions: 6
 
 regime:
   scan_interval_seconds: 30
